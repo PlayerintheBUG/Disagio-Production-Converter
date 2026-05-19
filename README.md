@@ -7,7 +7,7 @@ Un convertitore multimediale ad alte prestazioni, Sviluppato in Python con un'in
 ✨ Caratteristiche Principali
 
 🧠 Automazione e Gestione Intelligente
-- **Matrice Decisionale AUTO:** Il convertitore analizza istantaneamente i metadati del file sorgente tramite ffprobe e calcola dinamicamente il valore di CQ (Constant Quality) ideale. Questo permette di bilanciare in automatico il peso finale del file e la fedeltà visiva, senza richiedere interventi manuali o competenze tecniche.
+- **Decisionale AUTO:** Il convertitore analizza istantaneamente i metadati del file sorgente tramite ffprobe e calcola dinamicamente il valore di CQ (Constant Quality) ideale. Questo permette di bilanciare in automatico il peso finale del file e la fedeltà visiva, senza richiedere interventi manuali o competenze tecniche.
 - **Downscale Avanzato con Padding:** Ridimensiona i video sfruttando l'altissima qualità del filtro Lanczos. Il software calcola al millesimo i margini geometrici (padding) per preservare l'aspect ratio originale, evitando qualsiasi tipo di distorsione o allungamento dell'immagine.
 
 📸 Elaborazione e Conversione Immagini
