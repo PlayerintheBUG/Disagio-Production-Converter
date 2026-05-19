@@ -40,6 +40,6 @@ sudo dnf install ffmpeg ffmpeg-free-devel
 ### 2. Clonazione e Configurazione
 Esegui questi comandi nel terminale per scaricare il progetto e installare la libreria grafica necessaria.
 ```bash
-git clone [github.com/PlayerintheBUG/Disagio-Production-Converter.git](https://github.com/PlayerintheBUG/Disagio-Production-Converter.git)
+git clone https://github.com/PlayerintheBUG/Disagio-Production-Converter.git
 cd Disagio-Production-Converter
 pip install PyQt6
