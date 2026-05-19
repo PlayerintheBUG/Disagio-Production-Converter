@@ -60,6 +60,23 @@ Se preferisci non usare l'eseguibile e lanciarlo tramite Python:
    git clone [https://github.com/PlayerintheBUG/Disagio-Production-Converter.git](https://github.com/PlayerintheBUG/Disagio-Production-Converter.git)
 
 ---
-## ⚖️ Licenza e Note Legali
-* **Codice Sorgente:** Questo progetto è distribuito sotto licenza **GNU GPL v3**.
-* **FFmpeg / FFprobe:** Questo software include e utilizza i binari compilati di FFmpeg e FFprobe (disponibili su [ffmpeg.org](https://ffmpeg.org/)), distribuiti sotto licenza **GNU GPL v3** (build full fornita da gyan.dev). Il codice sorgente originale e non modificato di FFmpeg può essere scaricato direttamente dal loro sito ufficiale.
+⚖️ Licenza e Note Legali
+
+**Codice sorgente del progetto**  
+Questo progetto è distribuito sotto licenza **GNU General Public License v3.0** (GPLv3).  
+Il codice sorgente completo è disponibile su questo repository GitHub.
+
+**FFmpeg e FFprobe**  
+L'eseguibile Windows include al suo interno i binari di **FFmpeg** e **ffprobe** (build full) per funzionare in modalità completamente standalone.
+
+- I binari provengono dalle build ufficiali **[gyan.dev](https://www.gyan.dev/ffmpeg/builds/)** (versione full GPLv3).
+- FFmpeg è rilasciato sotto **GNU General Public License v3** a causa dell'inclusione di codec e librerie sotto licenza GPL (es. x264, x265, ecc.).
+- **Nessuna modifica** è stata apportata ai binari originali di FFmpeg.
+
+**Come ottenere il codice sorgente di FFmpeg**  
+Puoi scaricare il codice sorgente corrispondente alla versione utilizzata qui:  
+→ [https://ffmpeg.org/download.html](https://ffmpeg.org/download.html) (sezione "Source code")  
+
+Oppure clonando direttamente il repository ufficiale:  
+```bash
+git clone https://git.ffmpeg.org/ffmpeg.git
