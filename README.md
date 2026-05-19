@@ -21,16 +21,16 @@ Integrazione nativa con i principali encoder para sfruttare al massimo CPU e GPU
 * Codifica software ottimizzata via CPU
 
 ---
-🚀 Installazione e Utilizzo
+###🚀 Installazione e Utilizzo
 
 Il Disagio Production Converter è progettato per essere versatile. Scegli la procedura adatta al tuo sistema operativo:
-🐧 Per utenti Linux (Nobara/Arch/Ubuntu)
+🐧 Per utenti Linux (Fedora/Arch/Ubuntu)
 
 Il software sfrutta le librerie di sistema per garantire le massime prestazioni.
 
 Assicurati di avere ffmpeg e ffprobe installati:
 
-  Esempio su Nobara/Fedora:
+  Esempio su Fedora:
     sudo dnf install ffmpeg ffmpeg-free-devel
 
    Clona il repository e installa le dipendenze Python:
