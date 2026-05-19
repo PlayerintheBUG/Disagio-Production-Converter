@@ -45,7 +45,7 @@ Avvia l'applicazione:
 
 🪟 Per utenti Windows 10/11
 
-Non è necessaria alcuna configurazione. Abbiamo impacchettato tutto in un unico file eseguibile.
+Non è necessaria alcuna configurazione. è impacchettato tutto in un unico file eseguibile.
 
     Vai nella sezione Releases di questo repository.
 
