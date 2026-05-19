@@ -1,6 +1,6 @@
 # 🎬 Disagio Production Converte
 
-Un convertitore multimediale leggero, ignorante e devastante basato su **PyQt6** e **FFmpeg**. Progettato specificamente per le esigenze di pre e post-produzione video/audio, ottimizzato per flussi di lavoro rapidi e senza i fronzoli dei software proprietari.
+Un convertitore multimediale leggero. basato su **PyQt6** e **FFmpeg**.
 
 ## 🚀 Caratteristiche Principali
 
@@ -9,8 +9,6 @@ Un convertitore multimediale leggero, ignorante e devastante basato su **PyQt6**
 * **Audio ad Alta Fedeltà:** Gestione profili audio avanzati tra cui **FLAC** (con compressione variabile) e **PCM 32-bit float / 24-bit** per archiviare master e registrazioni senza alcuna perdita di qualità.
 * **FFmpeg Live Preview:** Monitoraggio in tempo reale della stringa di comando esatta generata dall'interfaccia grafica, con supporto alla modalità di **modifica manuale** per i flussi di lavoro più complessi.
 * **Elaborazione in Batch Sicura:** Converte file singoli o intere cartelle mantenendo l'albero delle directory in una cartella dedicata (`CONVERTITI_DISAGIO`), con un algoritmo di auto-rinomina per evitare la sovrascrittura accidentale dei file RAW originali.
-
-## 🛠 Requisiti e Installazione (Linux / Nobara)
 
 Assicurati che `ffmpeg` e `ffprobe` siano installati nel sistema e accessibili dal percorso globale:
 ```bash
