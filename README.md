@@ -13,3 +13,14 @@ Un convertitore multimediale leggero. basato su **PyQt6** e **FFmpeg**.
 Assicurati che `ffmpeg` e `ffprobe` siano installati nel sistema e accessibili dal percorso globale:
 ```bash
 sudo dnf install ffmpeg ffmpeg-free-devel
+
+# Clona il progetto
+git clone [https://github.com/PlayerintheBUG/Disagio-Production-Converter.git](https://github.com/PlayerintheBUG/Disagio-Production-Converter.git)
+cd Disagio-Production-Converter
+
+# Installa PyQt6 per il tuo utente
+pip install PyQt6 --user
+
+# Lancia il convertitore
+python3 Disagio_Production_Converter.py
+
