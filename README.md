@@ -43,17 +43,6 @@ Avvia l'applicazione:
 
     python disagio_converter.py
 
-🪟 Per utenti Windows 10/11
-
-Non è necessaria alcuna configurazione. è impacchettato tutto in un unico file eseguibile.
-
-    Vai nella sezione Releases di questo repository.
-
-Scarica l'ultima versione disponibile (Disagio_Production_Converter.exe).
-
-Avvia il file con un doppio clic.
-
-Nota: L'eseguibile contiene già al suo interno ffmpeg e ffprobe, quindi è pronto all'uso immediato senza bisogno di installare Python o altri componenti aggiuntivi.
 
 ## 📜 Licenza
 
