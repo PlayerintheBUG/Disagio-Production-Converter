@@ -24,7 +24,7 @@ Integrazione nativa con i principali encoder para sfruttare al massimo CPU e GPU
 🚀 Installazione e Utilizzo
 
 Il Disagio Production Converter è progettato per essere versatile. Scegli la procedura adatta al tuo sistema operativo:
-🐧 Per utenti Linux (Fedora/Arch/Ubuntu)
+🐧 Per utenti Linux
 
 Il software sfrutta le librerie di sistema per garantire le massime prestazioni.
 
