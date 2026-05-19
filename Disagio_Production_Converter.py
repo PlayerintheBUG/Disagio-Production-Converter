@@ -334,9 +334,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DISAGIO PRODUCTION CONVERTER
 Open source video/audio converter — PyQt6 + FFmpeg
-This software includes FFmpeg binaries (full build from gyan.dev)
-distributed under the GNU GPLv3 license.
-FFmpeg source code available at: https://ffmpeg.org/download.html
 Repository: https://github.com/PlayerintheBUG/Disagio-Production-Converter
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
 
