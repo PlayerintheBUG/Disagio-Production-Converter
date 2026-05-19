@@ -13,7 +13,6 @@ Un convertitore multimediale ad alte prestazioni, Sviluppato in Python con un'in
 📸 Elaborazione e Conversione Immagini
 - **Convertitore Grafico Multiformato:** Espande le funzionalità del software oltre il comparto video, introducendo la gestione nativa dei file grafici. Consente di convertire qualsiasi immagine sorgente nei formati JPG, PNG, WebP e BMP.
 - **Profili di Compressione Dedicati:** Ottimizza lo spazio su disco o la qualità visiva grazie a algoritmi di compressione specifici per WebP e JPG, permettendo di scegliere tra il massimo risparmio di spazio o la conservazione millimetrica dei dettagli.
-- **Interfaccia Dinamica:** La GUI si adatta automaticamente rilevando il tipo di file caricato, mostrando all'utente solo i filtri, i parametri e le opzioni pertinenti alla modalità Video o alla modalità Immagine.
 
 🛡️ Stabilità ed Efficienza di Sistema
 - **Interfaccia Grafica Anti-Freeze:** Sfrutta l'architettura in multithreading nativo (QThread). Il motore di rendering lavora in totale isolamento in background: l'interfaccia utente (PyQt6) rimane fluida, risponde istantaneamente ai comandi e aggiorna la barra di avanzamento in tempo reale anche durante le conversioni più pesanti.
