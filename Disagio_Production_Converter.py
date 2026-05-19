@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 # ============================================================
-#  Disagio_Production_Converter.py  —  DISAGIO PRODUCTION CONVERTER
-#  Converte video e audio con GUI PyQt6 + terminale in RT
-# ============================================================
-#  Copyright (C) 2026 PlayerintheBUG
+# Disagio_Producition_Converter.py  —  DISAGIO PRODUCTION CONVERTER
 #
-#  Questo programma è software libero: puoi ridistribuirlo e/o
-#  modificarlo secondo i termini della Licenza Pubblica Generica
-#  GNU (GPL) versione 3, come pubblicata dalla Free Software Foundation.
+#  Copyright (C) 2026  playerinthebug
 #
-#  Questo programma è distribuito nella speranza che sia utile,
-#  ma SENZA ALCUNA GARANZIA; senza nemmeno la garanzia implicita
-#  di COMMERCIABILITÀ o IDONEITÀ PER UNO SCOPO PARTICOLARE.
-#  Vedi la licenza GNU GPL v3 per maggiori dettagli.
+#  This program is free software: you can redistribute it
+#  and/or modify it under the terms of the GNU General Public
+#  License as published by the Free Software Foundation,
+#  either version 3 of the License, or (at your option) any
+#  later version.
+#
+#  This program is distributed in the hope that it will be
+#  useful, but WITHOUT ANY WARRANTY; without even the implied
+#  warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+#  PURPOSE. See the GNU General Public License for more
+#  details: <https://www.gnu.org/licenses/>
+#
+#  Dipendenze: PyQt6, ffmpeg
+#  Installazione: pip install PyQt6 --user
 # ============================================================
 
 import sys
@@ -24,7 +29,8 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QButtonGroup, QRadioButton, QComboBox,
     QLineEdit, QFileDialog, QPlainTextEdit, QProgressBar,
-    QFrame, QScrollArea, QMessageBox, QGroupBox, QCheckBox
+    QFrame, QScrollArea, QMessageBox, QGroupBox, QCheckBox,
+    QDialog, QDialogButtonBox, QTextEdit
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont, QTextCursor
@@ -109,7 +115,7 @@ VIDEO_PRESETS = {
             "Basso": "-c:v libx265 -preset faster -crf 32 -pix_fmt yuv420p",
         },
     },
-    # DNxHR e ProRes sono sempre CPU — nessun encoder GPU disponibile
+    # DNxHR e ProRes: sempre CPU
     "DNxHR": {
         "Alto":  "-c:v dnxhd -profile:v dnxhr_hqx -pix_fmt yuv422p10le",
         "Medio": "-c:v dnxhd -profile:v dnxhr_hq  -pix_fmt yuv422p",
@@ -121,6 +127,90 @@ VIDEO_PRESETS = {
         "Basso": "-c:v prores_ks -profile:v standard -pix_fmt yuv422p10le",
     },
 }
+
+# ── Matrice AUTO ──────────────────────────────────────────────
+# Efficienza relativa codec sorgente (moltiplicatore verso H264 equiv)
+CODEC_EFFICIENCY = {
+    "mpeg2video": 3.0,
+    "mpeg4":      1.5,
+    "h264":       1.0,
+    "hevc":       0.5,
+    "vp8":        0.9,
+    "vp9":        0.5,
+    "av1":        0.4,
+    "theora":     1.8,
+    "wmv1":       2.0, "wmv2": 2.0, "wmv3": 1.8,
+    "prores":     5.0,   # 422 base
+    "dnxhd":      4.0,
+    "rv30":       2.0, "rv40": 1.8,
+}
+
+# Profilo ProRes → moltiplicatore più preciso
+PRORES_PROFILE_EFFICIENCY = {
+    "0": 4.0,   # proxy
+    "1": 4.5,   # lt
+    "2": 5.0,   # 422
+    "3": 6.0,   # 422 hq
+    "4": 7.0,   # 4444
+    "5": 9.0,   # 4444 xq
+}
+
+# CQ base per codec destinazione
+AUTO_BASE_CQ = {
+    "AV1":   28,
+    "H.264": 20,
+    "H.265": 24,
+}
+
+# Delta risoluzione (su risoluzione DESTINAZIONE)
+AUTO_DELTA_RES = {
+    "480p":     +4,
+    "720p":     +2,
+    "1080p":     0,
+    "1440p QHD": -2,
+    "4K UHD":   -4,
+    "8K UHD":   -6,
+    "Originale": 0,  # calcolato dinamicamente dopo
+}
+
+# Delta fps
+def auto_delta_fps(fps: float) -> int:
+    if fps <= 24:   return +1
+    if fps <= 30:   return  0
+    if fps <= 60:   return -2
+    return -4
+
+# Delta bit depth
+def auto_delta_depth(depth: int) -> int:
+    if depth <= 8:  return  0
+    if depth == 10: return -2
+    return -3
+
+# Delta complessità (bits per pixel per frame, normalizzato)
+def auto_delta_bpp(bpp: float) -> int:
+    if bpp < 0.05:  return +6
+    if bpp < 0.15:  return +3
+    if bpp < 0.40:  return  0
+    if bpp < 1.0:   return -3
+    if bpp < 3.0:   return -5
+    return -7
+
+# Profilo DNxHR/ProRes in base a risoluzione e bit depth sorgente
+def auto_mezzanine_profile(codec_dst: str, width: int, height: int, depth: int) -> str:
+    is_4k = (width >= 3840 or height >= 2160)
+    if codec_dst == "DNxHR":
+        if is_4k or depth >= 10:
+            return "-c:v dnxhd -profile:v dnxhr_hqx -pix_fmt yuv422p10le"
+        return "-c:v dnxhd -profile:v dnxhr_hq -pix_fmt yuv422p"
+    if codec_dst == "ProRes":
+        if depth >= 10 and is_4k:
+            return "-c:v prores_ks -profile:v 4444 -pix_fmt yuva444p10le"
+        if is_4k or depth >= 10:
+            return "-c:v prores_ks -profile:v hq -pix_fmt yuv422p10le"
+        return "-c:v prores_ks -profile:v standard -pix_fmt yuv422p10le"
+    return ""
+
+# ─────────────────────────────────────────────────────────────
 
 AUDIO_CODECS = ["FLAC", "PCM", "AAC", "Opus", "MP3"]
 
@@ -160,6 +250,17 @@ SAMPLE_RATES = ["Mantieni originale", "44100 Hz", "48000 Hz", "96000 Hz", "19200
 
 GPU_OPTIONS = ["NVIDIA", "AMD", "Intel", "CPU"]
 
+# Risoluzioni 16:9 con dimensioni esatte
+RESOLUTIONS = {
+    "Mantieni originale": None,
+    "480p  (854×480)":    (854,  480),
+    "720p  (1280×720)":   (1280, 720),
+    "1080p (1920×1080)":  (1920, 1080),
+    "1440p QHD (2560×1440)": (2560, 1440),
+    "4K UHD (3840×2160)": (3840, 2160),
+    "8K UHD (7680×4320)": (7680, 4320),
+}
+
 VIDEO_EXTENSIONS = {".mp4",".mkv",".mov",".avi",".webm",".flv",
                     ".mts",".m2ts",".ts",".wmv",".vob",".mpg",
                     ".mpeg",".ogv",".divx",".m4v",".3gp"}
@@ -168,43 +269,204 @@ AUDIO_EXTENSIONS = {".mp3",".flac",".wav",".aac",".m4a",".ogg",
                     ".opus",".wma",".aiff",".aif",".ac3",".dts",
                     ".mka",".wv",".ape",".ra",".voc",".w64"}
 
+LICENSE_TEXT = """GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
+
+Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+Copyright (C) 2026 playerinthebug
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DISAGIO PRODUCTION CONVERTER
+Open source video/audio converter — PyQt6 + ffmpeg
+Repository: github.com/playerinthebug/disagio-converter
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
+
+# ============================================================
+#  ANALISI SORGENTE (per modalità AUTO)
+# ============================================================
+def probe_video(path: str) -> dict:
+    """Legge le proprietà video con ffprobe. Ritorna dict con i valori."""
+    result = {
+        "codec":     "h264",
+        "width":     1920,
+        "height":    1080,
+        "fps":       25.0,
+        "bitrate":   8_000_000,
+        "depth":     8,
+        "profile":   "0",
+    }
+    try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-select_streams", "v:0",
+             "-show_entries",
+             "stream=codec_name,width,height,r_frame_rate,bit_rate,bits_per_raw_sample,profile",
+             "-of", "default=noprint_wrappers=1", path],
+            capture_output=True, text=True, timeout=20
+        )
+        for line in r.stdout.splitlines():
+            if "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            if k == "codec_name"         and v: result["codec"]   = v.lower()
+            elif k == "width"            and v.isdigit(): result["width"]  = int(v)
+            elif k == "height"           and v.isdigit(): result["height"] = int(v)
+            elif k == "bits_per_raw_sample" and v.isdigit() and int(v) > 0:
+                result["depth"] = int(v)
+            elif k == "bit_rate"         and v.isdigit(): result["bitrate"] = int(v)
+            elif k == "profile"          and v: result["profile"] = v
+            elif k == "r_frame_rate"     and "/" in v:
+                num, den = v.split("/")
+                if int(den) > 0:
+                    result["fps"] = round(int(num) / int(den), 3)
+        # fallback bitrate dal formato se non nel stream
+        if result["bitrate"] == 8_000_000:
+            r2 = subprocess.run(
+                ["ffprobe", "-v", "quiet", "-show_entries", "format=bit_rate",
+                 "-of", "default=noprint_wrappers=1:nokey=1", path],
+                capture_output=True, text=True, timeout=10
+            )
+            v2 = r2.stdout.strip()
+            if v2.isdigit():
+                result["bitrate"] = int(v2)
+    except Exception:
+        pass
+    return result
+
+def auto_compute_cq(src_info: dict, codec_dst: str, gpu: str,
+                    dst_width: int, dst_height: int) -> str:
+    """
+    Calcola i parametri video ottimali per il codec di destinazione
+    basandosi sulle proprietà del sorgente.
+    Ritorna la stringa di parametri ffmpeg.
+    """
+    codec_src = src_info["codec"]
+    bitrate   = src_info["bitrate"]
+    fps       = src_info["fps"]
+    depth     = src_info["depth"]
+    width     = src_info["width"]
+    height    = src_info["height"]
+    profile   = src_info.get("profile", "0")
+
+    # efficienza codec sorgente
+    efficiency = CODEC_EFFICIENCY.get(codec_src, 1.0)
+    # ProRes: affina in base al profilo
+    if codec_src == "prores":
+        p = str(profile).lower()
+        for k, v in PRORES_PROFILE_EFFICIENCY.items():
+            if k in p or p == k:
+                efficiency = v
+                break
+
+    # bitrate equivalente H264
+    bitrate_equiv = bitrate * efficiency
+
+    # bits per pixel per frame (sulla risoluzione di DESTINAZIONE)
+    dst_pixels = dst_width * dst_height
+    bpp = (bitrate_equiv / max(fps, 1)) / max(dst_pixels, 1)
+
+    # per DNxHR/ProRes non si usa CQ — profilo fisso
+    if codec_dst in ("DNxHR", "ProRes"):
+        return auto_mezzanine_profile(codec_dst, dst_width, dst_height, depth)
+
+    # determina range risoluzione destinazione per delta
+    if dst_height >= 4320:    res_key = "8K UHD"
+    elif dst_height >= 2160:  res_key = "4K UHD"
+    elif dst_height >= 1440:  res_key = "1440p QHD"
+    elif dst_height >= 1080:  res_key = "1080p"
+    elif dst_height >= 720:   res_key = "720p"
+    else:                     res_key = "480p"
+
+    cq = (AUTO_BASE_CQ.get(codec_dst, 24)
+          + AUTO_DELTA_RES.get(res_key, 0)
+          + auto_delta_fps(fps)
+          + auto_delta_depth(depth)
+          + auto_delta_bpp(bpp))
+
+    # clamp: mai sotto 8 (eccessivo) né sopra 51
+    cq = max(8, min(51, cq))
+
+    # costruisce stringa parametri in base a GPU e codec
+    if codec_dst == "AV1":
+        pix = "p010le" if depth >= 10 else "p010le"
+        if gpu == "NVIDIA":
+            p7 = "p7" if cq <= 18 else ("p6" if cq <= 28 else "p4")
+            return f"-c:v av1_nvenc -preset {p7} -cq {cq} -pix_fmt {pix}"
+        if gpu == "AMD":
+            q = "quality" if cq <= 18 else ("balanced" if cq <= 28 else "speed")
+            return f"-c:v av1_amf -quality {q} -rc cqp -qp_i {cq} -qp_p {cq} -pix_fmt yuv420p"
+        if gpu == "Intel":
+            p = "veryslow" if cq <= 18 else ("medium" if cq <= 28 else "faster")
+            return f"-c:v av1_qsv -preset {p} -global_quality {cq} -pix_fmt yuv420p"
+        # CPU
+        pr = 3 if cq <= 18 else (6 if cq <= 28 else 9)
+        return f"-c:v libsvtav1 -preset {pr} -crf {cq} -pix_fmt {pix}"
+
+    if codec_dst == "H.264":
+        pix = "yuv420p"
+        if gpu == "NVIDIA":
+            p = "p7" if cq <= 18 else ("p5" if cq <= 28 else "p3")
+            return f"-c:v h264_nvenc -preset {p} -cq {cq} -pix_fmt {pix}"
+        if gpu == "AMD":
+            q = "quality" if cq <= 18 else ("balanced" if cq <= 28 else "speed")
+            return f"-c:v h264_amf -quality {q} -rc cqp -qp_i {cq} -qp_p {cq} -pix_fmt {pix}"
+        if gpu == "Intel":
+            p = "veryslow" if cq <= 18 else ("medium" if cq <= 28 else "faster")
+            return f"-c:v h264_qsv -preset {p} -global_quality {cq} -pix_fmt {pix}"
+        p = "slow" if cq <= 18 else ("medium" if cq <= 28 else "faster")
+        return f"-c:v libx264 -preset {p} -crf {cq} -pix_fmt {pix}"
+
+    if codec_dst == "H.265":
+        pix = "p010le" if depth >= 10 else "yuv420p"
+        if gpu == "NVIDIA":
+            p = "p7" if cq <= 18 else ("p5" if cq <= 28 else "p3")
+            return f"-c:v hevc_nvenc -preset {p} -cq {cq} -pix_fmt {pix}"
+        if gpu == "AMD":
+            q = "quality" if cq <= 18 else ("balanced" if cq <= 28 else "speed")
+            return f"-c:v hevc_amf -quality {q} -rc cqp -qp_i {cq} -qp_p {cq} -pix_fmt {pix}"
+        if gpu == "Intel":
+            p = "veryslow" if cq <= 18 else ("medium" if cq <= 28 else "faster")
+            return f"-c:v hevc_qsv -preset {p} -global_quality {cq} -pix_fmt {pix}"
+        p = "slow" if cq <= 18 else ("medium" if cq <= 28 else "faster")
+        return f"-c:v libx265 -preset {p} -crf {cq} -pix_fmt {pix}"
+
+    return ""
+
 # ============================================================
 #  STILE
 # ============================================================
 STYLE = """
 QMainWindow, QWidget {
-    background-color: #1a1a2e;
-    color: #e0e0e0;
-    font-family: 'Segoe UI', 'Inter', sans-serif;
-    font-size: 13px;
+    background-color: #1a1a2e; color: #e0e0e0;
+    font-family: 'Segoe UI', 'Inter', sans-serif; font-size: 13px;
 }
 QGroupBox {
-    border: 1px solid #2d2d4e;
-    border-radius: 8px;
-    margin-top: 12px;
-    padding: 12px;
-    font-weight: bold;
-    color: #a0a0ff;
+    border: 1px solid #2d2d4e; border-radius: 8px;
+    margin-top: 12px; padding: 12px;
+    font-weight: bold; color: #a0a0ff;
 }
-QGroupBox::title {
-    subcontrol-origin: margin;
-    left: 10px;
-    padding: 0 6px;
-}
+QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 6px; }
 QPushButton {
-    background-color: #2d2d4e;
-    color: #e0e0e0;
-    border: 1px solid #3d3d6e;
-    border-radius: 6px;
-    padding: 8px 18px;
-    font-weight: bold;
+    background-color: #2d2d4e; color: #e0e0e0;
+    border: 1px solid #3d3d6e; border-radius: 6px;
+    padding: 8px 18px; font-weight: bold;
 }
-QPushButton:hover { background-color: #3d3d6e; border-color: #6060cc; }
+QPushButton:hover  { background-color: #3d3d6e; border-color: #6060cc; }
 QPushButton:pressed { background-color: #5050aa; }
 QPushButton#btn_primary {
-    background-color: #4444aa;
-    border-color: #6060dd;
-    color: #ffffff;
+    background-color: #4444aa; border-color: #6060dd; color: #ffffff;
 }
 QPushButton#btn_primary:hover { background-color: #5555cc; }
 QPushButton#btn_primary:disabled {
@@ -212,6 +474,11 @@ QPushButton#btn_primary:disabled {
 }
 QPushButton#btn_danger { background-color: #6e2d2d; border-color: #aa4444; }
 QPushButton#btn_danger:hover { background-color: #aa3333; }
+QPushButton#btn_license {
+    background-color: #1a2a1a; border-color: #336633;
+    color: #88cc88; font-size: 11px; padding: 4px 10px;
+}
+QPushButton#btn_license:hover { background-color: #224422; }
 QRadioButton { spacing: 8px; color: #e0e0e0; padding: 4px; }
 QRadioButton::indicator {
     width: 16px; height: 16px; border-radius: 8px;
@@ -241,15 +508,21 @@ QLineEdit:focus { border-color: #6060dd; }
 QPlainTextEdit {
     background-color: #0d0d1a; color: #00ff88;
     border: 1px solid #2d2d4e; border-radius: 6px;
-    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    font-family: 'JetBrains Mono','Fira Code','Courier New',monospace;
     font-size: 12px;
+}
+QTextEdit {
+    background-color: #0d1a0d; color: #88cc88;
+    border: 1px solid #2d4e2d; border-radius: 6px;
+    font-family: 'Courier New', monospace; font-size: 11px;
 }
 QProgressBar {
     background-color: #2d2d4e; border: 1px solid #3d3d6e;
     border-radius: 4px; height: 10px; text-align: center; color: #ffffff;
 }
 QProgressBar::chunk {
-    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #4444aa,stop:1 #6060ff);
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 #4444aa, stop:1 #6060ff);
     border-radius: 4px;
 }
 QScrollArea { border: none; }
@@ -257,8 +530,32 @@ QLabel#section_title {
     color: #8080ff; font-size: 11px; font-weight: bold; letter-spacing: 1px;
 }
 QLabel#file_label { color: #aaaaff; font-size: 12px; padding: 4px; }
+QLabel#auto_warn  { color: #cc8800; font-size: 11px; font-style: italic; }
+QLabel#license_bar {
+    color: #336633; font-size: 11px;
+    padding: 3px 8px;
+    background: #0d1a0d;
+    border-top: 1px solid #1a3a1a;
+}
 QFrame#separator { background-color: #2d2d4e; max-height: 1px; }
 """
+
+# ============================================================
+#  DIALOG LICENZA
+# ============================================================
+class LicenseDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Licenza — GNU GPL v3")
+        self.resize(620, 480)
+        lay = QVBoxLayout(self)
+        txt = QTextEdit()
+        txt.setReadOnly(True)
+        txt.setPlainText(LICENSE_TEXT)
+        lay.addWidget(txt)
+        btn = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        btn.rejected.connect(self.accept)
+        lay.addWidget(btn)
 
 # ============================================================
 #  THREAD DI CONVERSIONE
@@ -271,50 +568,72 @@ class ConvertThread(QThread):
 
     def __init__(self, jobs, params):
         super().__init__()
-        self.jobs   = jobs
+        self.jobs   = jobs    # lista di (src, dst, src_info_or_None)
         self.params = params
         self._stop  = False
 
     def stop(self):
         self._stop = True
 
-    def get_video_preset(self):
+    def get_video_opts(self, src_info, dst_width, dst_height):
+        """Ritorna la stringa di parametri video (AUTO o preset fisso)."""
         gpu    = self.params.get("gpu", "NVIDIA")
         vcodec = self.params.get("vcodec", "AV1")
         vqual  = self.params.get("vqual", "Medio")
 
-        # DNxHR e ProRes non hanno varianti GPU
+        if vqual == "AUTO":
+            return auto_compute_cq(src_info, vcodec, gpu, dst_width, dst_height)
+
         if vcodec in ("DNxHR", "ProRes"):
             return VIDEO_PRESETS[vcodec][vqual]
+        return VIDEO_PRESETS.get(gpu, {}).get(vcodec, {}).get(vqual, "")
 
-        gpu_presets = VIDEO_PRESETS.get(gpu, {})
-        codec_presets = gpu_presets.get(vcodec, {})
-        return codec_presets.get(vqual, "")
+    def get_scale_filter(self, src_info, res_key):
+        """Ritorna il filtro -vf scale=... o stringa vuota se nessun scaling."""
+        dims = RESOLUTIONS.get(res_key)
+        if dims is None:
+            return ""
+        dst_w, dst_h = dims
+        # Mantieni aspect ratio: scala per la dimensione minore
+        # -2 assicura che la dimensione sia divisibile per 2
+        return f"scale={dst_w}:{dst_h}:flags=lanczos:force_original_aspect_ratio=decrease,pad={dst_w}:{dst_h}:(ow-iw)/2:(oh-ih)/2"
 
-    def build_cmd(self, src, dst):
+    def get_dst_dims(self, src_info, res_key):
+        """Ritorna (width, height) di destinazione per il calcolo AUTO."""
+        dims = RESOLUTIONS.get(res_key)
+        if dims:
+            return dims
+        return src_info["width"], src_info["height"]
+
+    def build_cmd(self, src, dst, src_info):
         # modalità manuale
         manual = self.params.get("manual_cmd", "")
         if manual:
             filled = manual.replace("{INPUT}", src).replace(
                 "{OUTPUT}", str(Path(dst).with_suffix("")))
             parts = filled.split()
-            parts = parts[:-1] + ["-progress", "pipe:1"] + [parts[-1]]
-            return parts
+            return parts[:-1] + ["-progress", "pipe:1"] + [parts[-1]]
 
-        mode   = self.params["mode"]
-        sample = self.params["sample_rate"]
+        mode    = self.params["mode"]
+        sample  = self.params["sample_rate"]
         hwaccel = self.params.get("hwaccel", True)
+        res_key = self.params.get("resolution", "Mantieni originale")
 
         sr_flag = [] if sample == "Mantieni originale" else ["-ar", sample.replace(" Hz", "")]
         hw_flag = ["-hwaccel", "auto"] if hwaccel else []
-
         audio_opts = self.params["audio_preset"].split()
+
         cmd = ["ffmpeg"] + hw_flag + ["-i", src]
 
         if mode == "audio":
             cmd += ["-vn"] + audio_opts + sr_flag + [dst, "-y", "-progress", "pipe:1"]
         else:
-            video_opts = self.get_video_preset().split()
+            dst_w, dst_h = self.get_dst_dims(src_info, res_key)
+            video_opts   = self.get_video_opts(src_info, dst_w, dst_h).split()
+            scale_filter = self.get_scale_filter(src_info, res_key)
+
+            if scale_filter:
+                cmd += ["-vf", scale_filter]
             cmd += video_opts + audio_opts + sr_flag + [dst, "-y", "-progress", "pipe:1"]
 
         return cmd
@@ -334,19 +653,27 @@ class ConvertThread(QThread):
         ok = err = 0
         total = len(self.jobs)
 
-        for idx, (src, dst) in enumerate(self.jobs):
+        for idx, (src, dst, src_info) in enumerate(self.jobs):
             if self._stop:
                 break
 
             fname = os.path.basename(src)
             self.log_line.emit(f"\n{'─'*50}")
             self.log_line.emit(f"[{idx+1}/{total}] {fname}")
+
+            # se AUTO, mostra i parametri calcolati
+            if self.params.get("vqual") == "AUTO" and self.params["mode"] == "video":
+                res_key = self.params.get("resolution", "Mantieni originale")
+                dst_w, dst_h = self.get_dst_dims(src_info, res_key)
+                computed = self.get_video_opts(src_info, dst_w, dst_h)
+                self.log_line.emit(f"  [AUTO] {computed}")
+
             self.log_line.emit(f"  → {dst}")
 
             os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
 
             duration = self.get_duration(src)
-            cmd = self.build_cmd(src, dst)
+            cmd = self.build_cmd(src, dst, src_info)
             self.log_line.emit("  $ " + " ".join(cmd))
 
             try:
@@ -356,13 +683,12 @@ class ConvertThread(QThread):
                 )
                 for line in proc.stdout:
                     if self._stop:
-                        proc.terminate()
-                        break
+                        proc.terminate(); break
                     line = line.rstrip()
                     if line.startswith("out_time_ms="):
                         try:
-                            ms = int(line.split("=")[1])
-                            t  = ms / 1_000_000
+                            ms  = int(line.split("=")[1])
+                            t   = ms / 1_000_000
                             if duration > 0:
                                 pct = min(int(t / duration * 100), 99)
                                 self.progress.emit(int((idx + pct/100) / total * 100))
@@ -388,8 +714,7 @@ class ConvertThread(QThread):
                 err += 1
                 self.log_line.emit("  ✗ ERRORE — file originale intatto")
                 try:
-                    if os.path.exists(dst):
-                        os.remove(dst)
+                    if os.path.exists(dst): os.remove(dst)
                 except Exception:
                     pass
 
@@ -404,28 +729,33 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("DISAGIO PRODUCTION CONVERTER")
-        self.setMinimumSize(860, 820)
-        self.resize(940, 900)
+        self.setMinimumSize(880, 860)
+        self.resize(960, 940)
         self.params = {}
         self.jobs   = []
         self.thread = None
         self._build_ui()
 
-    # ----------------------------------------------------------
-    #  BUILD UI
-    # ----------------------------------------------------------
     def _build_ui(self):
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
-        root.setSpacing(10)
-        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(8)
+        root.setContentsMargins(16, 16, 16, 8)
 
+        # ── titolo + licenza ──────────────────────────────────
+        title_row = QHBoxLayout()
         title = QLabel("DISAGIO PRODUCTION CONVERTER")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setFont(QFont("monospace", 15, QFont.Weight.Bold))
-        title.setStyleSheet("color:#8080ff; letter-spacing:2px; padding:6px;")
-        root.addWidget(title)
+        title.setFont(QFont("monospace", 14, QFont.Weight.Bold))
+        title.setStyleSheet("color:#8080ff; letter-spacing:2px;")
+        title_row.addWidget(title)
+        title_row.addStretch()
+        btn_lic = QPushButton("⚖  GPL v3")
+        btn_lic.setObjectName("btn_license")
+        btn_lic.setToolTip("Visualizza la licenza GNU GPL v3")
+        btn_lic.clicked.connect(self._show_license)
+        title_row.addWidget(btn_lic)
+        root.addLayout(title_row)
 
         sep = QFrame(); sep.setObjectName("separator")
         sep.setFrameShape(QFrame.Shape.HLine)
@@ -436,11 +766,11 @@ class MainWindow(QMainWindow):
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         opts_w = QWidget()
         self.opts_layout = QVBoxLayout(opts_w)
-        self.opts_layout.setSpacing(10)
+        self.opts_layout.setSpacing(8)
         scroll.setWidget(opts_w)
         root.addWidget(scroll, stretch=3)
 
-        # ── STEP 1: sorgente ──────────────────────────────────
+        # ── STEP 1 ────────────────────────────────────────────
         self._section("STEP 1 — Sorgente")
         row1 = QHBoxLayout()
         self.bg_mode = QButtonGroup(self)
@@ -450,8 +780,7 @@ class MainWindow(QMainWindow):
         self.bg_mode.addButton(self.rb_single, 0)
         self.bg_mode.addButton(self.rb_folder, 1)
         self.rb_single.toggled.connect(self._on_mode_changed)
-        row1.addWidget(self.rb_single)
-        row1.addWidget(self.rb_folder)
+        row1.addWidget(self.rb_single); row1.addWidget(self.rb_folder)
         row1.addStretch()
         self.opts_layout.addLayout(row1)
 
@@ -466,7 +795,7 @@ class MainWindow(QMainWindow):
         self.opts_layout.addLayout(frow)
         self._sep()
 
-        # ── STEP 2: tipo output ───────────────────────────────
+        # ── STEP 2 ────────────────────────────────────────────
         self._section("STEP 2 — Tipo output")
         row2 = QHBoxLayout()
         self.bg_type = QButtonGroup(self)
@@ -476,8 +805,7 @@ class MainWindow(QMainWindow):
         self.bg_type.addButton(self.rb_video, 0)
         self.bg_type.addButton(self.rb_audio, 1)
         self.rb_video.toggled.connect(self._on_type_changed)
-        row2.addWidget(self.rb_video)
-        row2.addWidget(self.rb_audio)
+        row2.addWidget(self.rb_video); row2.addWidget(self.rb_audio)
         row2.addStretch()
         self.opts_layout.addLayout(row2)
         self._sep()
@@ -486,7 +814,7 @@ class MainWindow(QMainWindow):
         self.grp_video = QGroupBox("STEP 3 — Video")
         vlay = QVBoxLayout(self.grp_video)
 
-        # GPU selector
+        # GPU
         gpu_row = QHBoxLayout()
         gpu_row.addWidget(QLabel("Encoder GPU:"))
         self.bg_gpu = QButtonGroup(self)
@@ -499,13 +827,12 @@ class MainWindow(QMainWindow):
         gpu_row.addStretch()
         vlay.addLayout(gpu_row)
 
-        # hwaccel flag
+        # hwaccel
         hw_row = QHBoxLayout()
         self.chk_hwaccel = QCheckBox("Accelerazione hardware decodifica  (-hwaccel auto)")
         self.chk_hwaccel.setChecked(True)
         self.chk_hwaccel.toggled.connect(self._update_cmd_preview)
-        hw_row.addWidget(self.chk_hwaccel)
-        hw_row.addStretch()
+        hw_row.addWidget(self.chk_hwaccel); hw_row.addStretch()
         vlay.addLayout(hw_row)
 
         # container + codec
@@ -519,22 +846,41 @@ class MainWindow(QMainWindow):
         cc_row.addWidget(QLabel("Codec video:"))
         self.cmb_vcodec = QComboBox()
         self.cmb_vcodec.currentTextChanged.connect(self._update_cmd_preview)
-        cc_row.addWidget(self.cmb_vcodec)
-        cc_row.addStretch()
+        cc_row.addWidget(self.cmb_vcodec); cc_row.addStretch()
         vlay.addLayout(cc_row)
 
-        # qualità video
+        # qualità + AUTO
         vq_row = QHBoxLayout()
         vq_row.addWidget(QLabel("Qualità video:"))
         self.bg_vqual = QButtonGroup(self)
-        for i, q in enumerate(["Alto", "Medio", "Basso"]):
+        for i, q in enumerate(["Alto", "Medio", "Basso", "AUTO"]):
             rb = QRadioButton(q)
             if q == "Medio": rb.setChecked(True)
             self.bg_vqual.addButton(rb, i)
-            rb.toggled.connect(self._update_cmd_preview)
+            rb.toggled.connect(self._on_vqual_changed)
             vq_row.addWidget(rb)
+        self.lbl_auto_warn = QLabel(
+            "⚠ Il sistema AUTO è una stima — può commettere errori su sorgenti atipici"
+        )
+        self.lbl_auto_warn.setObjectName("auto_warn")
+        self.lbl_auto_warn.setVisible(False)
+        vq_row.addWidget(self.lbl_auto_warn)
         vq_row.addStretch()
         vlay.addLayout(vq_row)
+
+        # risoluzione output
+        res_row = QHBoxLayout()
+        res_row.addWidget(QLabel("Risoluzione output:"))
+        self.cmb_res = QComboBox()
+        self.cmb_res.addItems(RESOLUTIONS.keys())
+        self.cmb_res.setCurrentText("Mantieni originale")
+        self.cmb_res.currentTextChanged.connect(self._update_cmd_preview)
+        res_row.addWidget(self.cmb_res)
+        res_row.addWidget(QLabel(
+            "<small style='color:#666688'>  Aspect ratio originale preservato  |  filtro: lanczos</small>"
+        ))
+        res_row.addStretch()
+        vlay.addLayout(res_row)
         self.opts_layout.addWidget(self.grp_video)
 
         # ── STEP 4: audio ─────────────────────────────────────
@@ -546,8 +892,7 @@ class MainWindow(QMainWindow):
         self.cmb_acodec = QComboBox()
         self.cmb_acodec.addItems(AUDIO_CODECS)
         self.cmb_acodec.currentTextChanged.connect(self._update_cmd_preview)
-        ac_row.addWidget(self.cmb_acodec)
-        ac_row.addStretch()
+        ac_row.addWidget(self.cmb_acodec); ac_row.addStretch()
         alay.addLayout(ac_row)
 
         aq_row = QHBoxLayout()
@@ -568,8 +913,7 @@ class MainWindow(QMainWindow):
         self.cmb_sample.addItems(SAMPLE_RATES)
         self.cmb_sample.setCurrentText("48000 Hz")
         self.cmb_sample.currentTextChanged.connect(self._update_cmd_preview)
-        sr_row.addWidget(self.cmb_sample)
-        sr_row.addStretch()
+        sr_row.addWidget(self.cmb_sample); sr_row.addStretch()
         alay.addLayout(sr_row)
         self.opts_layout.addWidget(self.grp_audio)
 
@@ -583,7 +927,7 @@ class MainWindow(QMainWindow):
         nlay.addWidget(self.txt_name)
         self.opts_layout.addWidget(self.grp_name)
 
-        # ── STEP 6: comando ffmpeg ────────────────────────────
+        # ── comando ffmpeg ─────────────────────────────────────
         self.grp_cmd = QGroupBox("Comando ffmpeg (aggiornato live)")
         clay = QVBoxLayout(self.grp_cmd)
         self.txt_cmd = QLineEdit()
@@ -594,24 +938,24 @@ class MainWindow(QMainWindow):
             "border-radius:6px; padding:6px 10px;")
         clay.addWidget(self.txt_cmd)
 
-        cmd_btn_row = QHBoxLayout()
+        cbr = QHBoxLayout()
         self.btn_manual = QPushButton("✏  Abilita modifica manuale")
         self.btn_manual.setCheckable(True)
         self.btn_manual.clicked.connect(self._toggle_manual)
-        self.lbl_hint = QLabel("Usa {INPUT} e {OUTPUT} come segnaposto per i percorsi file")
+        self.lbl_hint = QLabel("Usa {INPUT} e {OUTPUT} come segnaposto")
         self.lbl_hint.setStyleSheet("color:#666688; font-size:11px;")
         self.lbl_hint.setVisible(False)
-        cmd_btn_row.addWidget(self.btn_manual)
-        cmd_btn_row.addWidget(self.lbl_hint)
-        cmd_btn_row.addStretch()
-        clay.addLayout(cmd_btn_row)
+        cbr.addWidget(self.btn_manual)
+        cbr.addWidget(self.lbl_hint)
+        cbr.addStretch()
+        clay.addLayout(cbr)
         self.opts_layout.addWidget(self.grp_cmd)
 
         # init
         self._on_container_changed(self.cmb_container.currentText())
         self._on_type_changed()
 
-        # ── pulsante CONVERTI ─────────────────────────────────
+        # ── CONVERTI ──────────────────────────────────────────
         self.btn_go = QPushButton("▶  CONVERTI")
         self.btn_go.setObjectName("btn_primary")
         self.btn_go.setMinimumHeight(42)
@@ -627,7 +971,7 @@ class MainWindow(QMainWindow):
 
         self.terminal = QPlainTextEdit()
         self.terminal.setReadOnly(True)
-        self.terminal.setMinimumHeight(180)
+        self.terminal.setMinimumHeight(160)
         self.terminal.setPlaceholderText("L'output di ffmpeg apparirà qui…")
         root.addWidget(self.terminal, stretch=2)
 
@@ -637,12 +981,18 @@ class MainWindow(QMainWindow):
         self.btn_stop.clicked.connect(self._stop)
         root.addWidget(self.btn_stop)
 
-    # ----------------------------------------------------------
-    #  HELPERS UI
+        # ── barra licenza in fondo ────────────────────────────
+        lic_bar = QLabel(
+            "  DISAGIO PRODUCTION CONVERTER  —  Open source, licenza GNU GPL v3  "
+            "—  github.com/playerinthebug/disagio-converter"
+        )
+        lic_bar.setObjectName("license_bar")
+        lic_bar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        root.addWidget(lic_bar)
+
     # ----------------------------------------------------------
     def _section(self, text):
-        lbl = QLabel(text.upper())
-        lbl.setObjectName("section_title")
+        lbl = QLabel(text.upper()); lbl.setObjectName("section_title")
         self.opts_layout.addWidget(lbl)
 
     def _sep(self):
@@ -650,8 +1000,9 @@ class MainWindow(QMainWindow):
         f.setFrameShape(QFrame.Shape.HLine)
         self.opts_layout.addWidget(f)
 
-    # ----------------------------------------------------------
-    #  SLOT UI
+    def _show_license(self):
+        LicenseDialog(self).exec()
+
     # ----------------------------------------------------------
     def _on_mode_changed(self):
         is_single = self.rb_single.isChecked()
@@ -668,22 +1019,35 @@ class MainWindow(QMainWindow):
     def _on_type_changed(self):
         is_video = self.rb_video.isChecked()
         self.grp_video.setVisible(is_video)
-        step_a = "STEP 4 — Audio" if is_video else "STEP 3 — Audio"
-        self.grp_audio.setTitle(step_a)
-        step_n = "STEP 5 — Nome file output" if is_video else "STEP 4 — Nome file output"
-        self.grp_name.setTitle(step_n if self.rb_single.isChecked() else
-                               step_n.replace("Nome file output", "Prefisso file output"))
+        self.grp_audio.setTitle("STEP 4 — Audio" if is_video else "STEP 3 — Audio")
+        self.grp_name.setTitle(
+            ("STEP 5 — Nome file output" if self.rb_single.isChecked()
+             else "STEP 5 — Prefisso file output") if is_video else
+            ("STEP 4 — Nome file output" if self.rb_single.isChecked()
+             else "STEP 4 — Prefisso file output")
+        )
         self._update_cmd_preview()
+
+    def _on_vqual_changed(self):
+        btn = self.bg_vqual.checkedButton()
+        is_auto = btn and btn.text() == "AUTO"
+        self.lbl_auto_warn.setVisible(is_auto)
+        # in AUTO il comando preview non può mostrare valori reali
+        if is_auto:
+            self.txt_cmd.setText(
+                "ffmpeg [parametri calcolati automaticamente per ogni file — vedi terminale durante la conversione]"
+            )
+        else:
+            self._update_cmd_preview()
 
     def _on_container_changed(self, container):
         codecs = CONTAINER_CODECS.get(container, [])
         self.cmb_vcodec.clear()
         self.cmb_vcodec.addItems(codecs)
-        # nascondi selettore GPU per DNxHR/ProRes
-        is_gpu_codec = all(c not in ("DNxHR", "ProRes") for c in codecs)
+        is_gpu = all(c not in ("DNxHR", "ProRes") for c in codecs)
         for btn in self.bg_gpu.buttons():
-            btn.setEnabled(is_gpu_codec)
-        self.chk_hwaccel.setEnabled(is_gpu_codec)
+            btn.setEnabled(is_gpu)
+        self.chk_hwaccel.setEnabled(is_gpu)
         self._update_cmd_preview()
 
     def _get_selected_gpu(self):
@@ -695,6 +1059,8 @@ class MainWindow(QMainWindow):
         vcodec = self.cmb_vcodec.currentText()
         vqual  = (self.bg_vqual.checkedButton().text()
                   if self.bg_vqual.checkedButton() else "Medio")
+        if vqual == "AUTO":
+            return "[AUTO]"
         if vcodec in ("DNxHR", "ProRes"):
             return VIDEO_PRESETS[vcodec][vqual]
         return VIDEO_PRESETS.get(gpu, {}).get(vcodec, {}).get(vqual, "")
@@ -702,27 +1068,31 @@ class MainWindow(QMainWindow):
     def _update_cmd_preview(self):
         if hasattr(self, "btn_manual") and self.btn_manual.isChecked():
             return
+        btn = self.bg_vqual.checkedButton() if hasattr(self, "bg_vqual") else None
+        if btn and btn.text() == "AUTO":
+            return  # gestito da _on_vqual_changed
 
-        mode   = "audio" if self.rb_audio.isChecked() else "video"
-        acodec = self.cmb_acodec.currentText()
-        aqual  = (self.bg_aqual.checkedButton().text()
-                  if self.bg_aqual.checkedButton() else "Medio")
-        sample = self.cmb_sample.currentText()
+        mode    = "audio" if self.rb_audio.isChecked() else "video"
+        acodec  = self.cmb_acodec.currentText()
+        aqual   = (self.bg_aqual.checkedButton().text()
+                   if self.bg_aqual.checkedButton() else "Medio")
+        sample  = self.cmb_sample.currentText()
         audio_p = AUDIO_PRESETS.get(acodec, {}).get(aqual, "")
         if sample != "Mantieni originale":
-            audio_p += f" -ar {sample.replace(' Hz', '')}"
+            audio_p += f" -ar {sample.replace(' Hz','')}"
 
-        hwaccel = self.chk_hwaccel.isChecked()
-        hw_str  = "-hwaccel auto " if hwaccel else ""
+        hw  = "-hwaccel auto " if self.chk_hwaccel.isChecked() else ""
+        res = self.cmb_res.currentText() if hasattr(self, "cmb_res") else "Mantieni originale"
+        res_str = "" if res == "Mantieni originale" else f" -vf scale=W:H:flags=lanczos"
 
         if mode == "audio":
             ext = AUDIO_ONLY_EXT.get(acodec, "wav")
-            cmd = f"ffmpeg {hw_str}-i {{INPUT}} -vn {audio_p} {{OUTPUT}}.{ext} -y"
+            cmd = f"ffmpeg {hw}-i {{INPUT}} -vn {audio_p} {{OUTPUT}}.{ext} -y"
         else:
             video_p = self._get_video_preset_str()
-            ext_map = {"MKV (.mkv)": "mkv", "MP4 (.mp4)": "mp4", "MOV (.mov)": "mov"}
+            ext_map = {"MKV (.mkv)":"mkv","MP4 (.mp4)":"mp4","MOV (.mov)":"mov"}
             ext = ext_map.get(self.cmb_container.currentText(), "mkv")
-            cmd = f"ffmpeg {hw_str}-i {{INPUT}} {video_p} {audio_p} {{OUTPUT}}.{ext} -y"
+            cmd = f"ffmpeg {hw}-i {{INPUT}}{res_str} {video_p} {audio_p} {{OUTPUT}}.{ext} -y"
 
         if hasattr(self, "txt_cmd"):
             self.txt_cmd.setText(cmd.strip())
@@ -730,16 +1100,16 @@ class MainWindow(QMainWindow):
     def _toggle_manual(self, checked):
         self.txt_cmd.setReadOnly(not checked)
         self.lbl_hint.setVisible(checked)
-
-        controls = ([self.rb_video, self.rb_audio, self.rb_single, self.rb_folder,
-                     self.cmb_container, self.cmb_vcodec, self.cmb_acodec,
-                     self.cmb_sample, self.chk_hwaccel]
-                    + self.bg_vqual.buttons()
-                    + self.bg_aqual.buttons()
-                    + self.bg_gpu.buttons())
+        controls = (
+            [self.rb_video, self.rb_audio, self.rb_single, self.rb_folder,
+             self.cmb_container, self.cmb_vcodec, self.cmb_acodec,
+             self.cmb_sample, self.chk_hwaccel, self.cmb_res]
+            + list(self.bg_vqual.buttons())
+            + list(self.bg_aqual.buttons())
+            + list(self.bg_gpu.buttons())
+        )
         for w in controls:
             w.setEnabled(not checked)
-
         if checked:
             self.btn_manual.setText("🔒  Torna a modalità automatica")
             self.txt_cmd.setStyleSheet(
@@ -767,8 +1137,6 @@ class MainWindow(QMainWindow):
                 self.txt_name.setText(Path(path).stem)
 
     # ----------------------------------------------------------
-    #  PARAMETRI E JOBS
-    # ----------------------------------------------------------
     def _collect_params(self):
         mode    = "audio" if self.rb_audio.isChecked() else "video"
         vcodec  = self.cmb_vcodec.currentText()
@@ -780,18 +1148,17 @@ class MainWindow(QMainWindow):
         gpu     = self._get_selected_gpu()
         sample  = self.cmb_sample.currentText()
         hwaccel = self.chk_hwaccel.isChecked()
+        res_key = self.cmb_res.currentText()
 
-        ext_map  = {"MKV (.mkv)": "mkv", "MP4 (.mp4)": "mp4", "MOV (.mov)": "mov"}
+        ext_map   = {"MKV (.mkv)":"mkv","MP4 (.mp4)":"mp4","MOV (.mov)":"mov"}
         video_ext = ext_map.get(self.cmb_container.currentText(), "mkv")
         audio_ext = AUDIO_ONLY_EXT.get(acodec, "wav")
-
-        audio_preset = AUDIO_PRESETS.get(acodec, {}).get(aqual, "")
 
         return {
             "mode":         mode,
             "video_ext":    video_ext,
             "audio_ext":    audio_ext,
-            "audio_preset": audio_preset,
+            "audio_preset": AUDIO_PRESETS.get(acodec, {}).get(aqual, ""),
             "sample_rate":  sample,
             "gpu":          gpu,
             "hwaccel":      hwaccel,
@@ -799,19 +1166,16 @@ class MainWindow(QMainWindow):
             "acodec":       acodec,
             "vqual":        vqual,
             "aqual":        aqual,
+            "resolution":   res_key,
         }
 
     def _unique_path(self, dst):
-        if not os.path.exists(dst):
-            return dst
-        stem = Path(dst).stem
-        ext  = Path(dst).suffix
-        d    = Path(dst).parent
-        i    = 1
+        if not os.path.exists(dst): return dst
+        stem = Path(dst).stem; ext = Path(dst).suffix; d = Path(dst).parent
+        i = 1
         while True:
             c = d / f"{stem}_{i}{ext}"
-            if not c.exists():
-                return str(c)
+            if not c.exists(): return str(c)
             i += 1
 
     def _collect_jobs(self, params):
@@ -820,35 +1184,40 @@ class MainWindow(QMainWindow):
         mode      = params["mode"]
         out_ext   = params["audio_ext"] if mode == "audio" else params["video_ext"]
         prefix    = self.txt_name.text().strip()
+        is_auto   = (params.get("vqual") == "AUTO" and mode == "video")
         jobs      = []
 
         valid_exts = AUDIO_EXTENSIONS | VIDEO_EXTENSIONS
 
         if is_single:
-            if not os.path.isfile(path):
-                return []
+            if not os.path.isfile(path): return []
             stem = prefix if prefix else Path(path).stem
             dst  = str(Path(path).parent / f"{stem}.{out_ext}")
-            jobs.append((path, self._unique_path(dst)))
+            # probe solo se AUTO
+            info = probe_video(path) if is_auto else {
+                "codec":"h264","width":1920,"height":1080,
+                "fps":25.0,"bitrate":8_000_000,"depth":8,"profile":"0"
+            }
+            jobs.append((path, self._unique_path(dst), info))
         else:
-            if not os.path.isdir(path):
-                return []
+            if not os.path.isdir(path): return []
             out_dir = os.path.join(path, "CONVERTITI_DISAGIO")
             for root_d, _, files in os.walk(path):
-                if root_d.startswith(out_dir):
-                    continue
+                if root_d.startswith(out_dir): continue
                 for f in sorted(files):
-                    if Path(f).suffix.lower() not in valid_exts:
-                        continue
+                    if Path(f).suffix.lower() not in valid_exts: continue
                     src  = os.path.join(root_d, f)
                     stem = f"{prefix}_{Path(f).stem}" if prefix else Path(f).stem
                     rel  = os.path.relpath(root_d, path)
                     dst  = os.path.join(out_dir, rel, f"{stem}.{out_ext}")
-                    jobs.append((src, self._unique_path(dst)))
+                    # probe per ogni file se AUTO
+                    info = probe_video(src) if is_auto else {
+                        "codec":"h264","width":1920,"height":1080,
+                        "fps":25.0,"bitrate":8_000_000,"depth":8,"profile":"0"
+                    }
+                    jobs.append((src, self._unique_path(dst), info))
         return jobs
 
-    # ----------------------------------------------------------
-    #  AVVIO / STOP
     # ----------------------------------------------------------
     def _start(self):
         path = self.lbl_file.text()
@@ -857,8 +1226,18 @@ class MainWindow(QMainWindow):
             return
 
         params = self._collect_params()
-        jobs   = self._collect_jobs(params)
 
+        # se AUTO e cartella: avvisa che il probe richiede tempo
+        if params.get("vqual") == "AUTO" and self.rb_folder.isChecked():
+            if QMessageBox.question(
+                self, "Modalità AUTO — cartella",
+                "In modalità AUTO ogni file viene analizzato con ffprobe prima della conversione.\n"
+                "Su cartelle grandi questo può richiedere qualche minuto in più.\n\nProcedere?",
+                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
+            ) != QMessageBox.StandardButton.Ok:
+                return
+
+        jobs = self._collect_jobs(params)
         if not jobs:
             QMessageBox.warning(self, "Nessun file", "Nessun file da convertire trovato.")
             return
@@ -868,24 +1247,22 @@ class MainWindow(QMainWindow):
         else:
             params.pop("manual_cmd", None)
 
-        gpu_label = params["gpu"] if params["mode"] == "video" else "—"
-        hw_label  = "Sì" if params["hwaccel"] else "No"
-        prefix    = self.txt_name.text().strip()
-
         lines = [f"File da convertire: {len(jobs)}"]
         if params["mode"] == "video":
             lines += [
-                f"Encoder GPU: {gpu_label}",
-                f"HW decoding: {hw_label}",
+                f"Encoder GPU: {params['gpu']}",
+                f"HW decoding: {'Sì' if params['hwaccel'] else 'No'}",
                 f"Codec video: {params['vcodec']} — {params['vqual']}",
                 f"Container: .{params['video_ext']}",
+                f"Risoluzione: {params['resolution']}",
             ]
         lines += [
             f"Codec audio: {params['acodec']} — {params['aqual']}",
             f"Sample rate: {params['sample_rate']}",
         ]
-        if prefix and not self.rb_single.isChecked():
-            lines.append(f"Prefisso: {prefix}_")
+        pfx = self.txt_name.text().strip()
+        if pfx and not self.rb_single.isChecked():
+            lines.append(f"Prefisso: {pfx}_")
 
         if QMessageBox.question(
             self, "Conferma", "\n".join(lines),
@@ -893,9 +1270,7 @@ class MainWindow(QMainWindow):
         ) != QMessageBox.StandardButton.Ok:
             return
 
-        self.jobs   = jobs
-        self.params = params
-
+        self.jobs = jobs; self.params = params
         self.terminal.clear()
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(True)
@@ -914,9 +1289,6 @@ class MainWindow(QMainWindow):
             self.thread.stop()
             self._append_log("\n⚠  Conversione interrotta dall'utente.")
 
-    # ----------------------------------------------------------
-    #  SLOT THREAD
-    # ----------------------------------------------------------
     def _append_log(self, text):
         self.terminal.appendPlainText(text)
         self.terminal.moveCursor(QTextCursor.MoveOperation.End)
