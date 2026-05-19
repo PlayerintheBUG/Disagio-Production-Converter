@@ -631,6 +631,25 @@ class MainWindow(QMainWindow):
         self.terminal.setPlaceholderText("L'output di ffmpeg apparirà qui…")
         root.addWidget(self.terminal, stretch=2)
 
+self.terminal = QPlainTextEdit()
+        self.terminal.setReadOnly(True)
+        self.terminal.setMinimumHeight(180)
+        self.terminal.setPlaceholderText("L'output di ffmpeg apparirà qui…")
+        root.addWidget(self.terminal, stretch=2)
+
+        # ── DISCLAIMER LEGALE GPLv3 ALL'AVVIO ─────────────────
+        self.terminal.appendPlainText(
+            "==================================================\n"
+            " DISAGIO PRODUCTION CONVERTER - v1.0\n"
+            " Rilasciato sotto licenza GNU GPL v3\n"
+            "==================================================\n"
+            " Questo programma è software libero; è fornito\n"
+            " COMPLETAMENTE SENZA ALCUNA GARANZIA.\n"
+            " L'autore non risponde di eventuali danni o perdite\n"
+            " di dati derivati dall'uso di questo tool.\n"
+            "==================================================\n"
+        )
+
         self.btn_stop = QPushButton("■  INTERROMPI")
         self.btn_stop.setObjectName("btn_danger")
         self.btn_stop.setVisible(False)
@@ -639,7 +658,8 @@ class MainWindow(QMainWindow):
 
     # ----------------------------------------------------------
     #  HELPERS UI
-    # ----------------------------------------------------------
+    #
+ ----------------------------------------------------------
     def _section(self, text):
         lbl = QLabel(text.upper())
         lbl.setObjectName("section_title")
