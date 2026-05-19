@@ -60,7 +60,6 @@ Se preferisci non usare l'eseguibile e lanciarlo tramite Python:
    git clone [https://github.com/PlayerintheBUG/Disagio-Production-Converter.git](https://github.com/PlayerintheBUG/Disagio-Production-Converter.git)
 
 ---
-
 ## ⚖️ Licenza e Note Legali
 * **Codice Sorgente:** Questo progetto è distribuito sotto licenza **GNU GPL v3**.
-* **FFmpeg / FFprobe:** Questo software include e utilizza i binari compilati di FFmpeg e FFprobe (disponibili su [ffmpeg.org](https://ffmpeg.org/)), distribuiti sotto licenza GNU LGPLv2.1 / GPLv2+. Il codice sorgente originale e non modificato di FFmpeg può essere scaricato direttamente dal loro sito ufficiale.
+* **FFmpeg / FFprobe:** Questo software include e utilizza i binari compilati di FFmpeg e FFprobe (disponibili su [ffmpeg.org](https://ffmpeg.org/)), distribuiti sotto licenza **GNU GPL v3** (build full fornita da gyan.dev). Il codice sorgente originale e non modificato di FFmpeg può essere scaricato direttamente dal loro sito ufficiale.
