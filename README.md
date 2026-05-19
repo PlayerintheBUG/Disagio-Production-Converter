@@ -7,7 +7,7 @@ Un convertitore multimediale ad alte prestazioni, ottimizzato per i flussi di la
 ## ✨ Caratteristiche Principali
 
 ### 🧠 Automazione Intelligente (v1.1.0)
-* **Matrice Decisionale AUTO:** Analizza i metadati del file sorgente tramite `ffprobe` e calcola dinamicamente il valore di CQ (Constant Quality) ideale. Bilancia automaticamente il peso del file e la qualità visiva senza interventi manuali.
+* **Decisionale AUTO:** Analizza i metadati del file sorgente tramite `ffprobe` e calcola dinamicamente il valore di CQ (Constant Quality) ideale. Bilancia automaticamente il peso del file e la qualità visiva senza interventi manuali.
 * **Downscale con Padding:** Ridimensiona i video utilizzando l'algoritmo **Lanczos**, calcolando il padding al millesimo per mantenere l'aspect ratio originale senza deformare l'immagine.
 
 ### 🛡️ Stabilità ed Efficienza
