@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (
     QLabel, QPushButton, QButtonGroup, QRadioButton, QComboBox,
     QLineEdit, QFileDialog, QPlainTextEdit, QProgressBar,
     QFrame, QScrollArea, QMessageBox, QGroupBox, QCheckBox,
-    QDialog, QDialogButtonBox, QTextEdit
+    QDialog, QDialogButtonBox, QTextEdit, QSlider, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont, QTextCursor
@@ -268,6 +268,49 @@ VIDEO_EXTENSIONS = {".mp4",".mkv",".mov",".avi",".webm",".flv",
 AUDIO_EXTENSIONS = {".mp3",".flac",".wav",".aac",".m4a",".ogg",
                     ".opus",".wma",".aiff",".aif",".ac3",".dts",
                     ".mka",".wv",".ape",".ra",".voc",".w64"}
+
+IMAGE_EXTENSIONS = {".jpg",".jpeg",".png",".webp",".bmp",".tiff",".tif",
+                    ".gif",".tga",".heic",".heif",".avif"}
+
+RAW_EXTENSIONS   = {".cr2",".cr3",".nef",".arw",".dng",".pef",".orf",
+                    ".rw2",".raf",".3fr",".mef",".mrw",".sr2",".raw",
+                    ".nrw",".srf",".erf",".kdc",".dcr"}
+
+# Formati di output immagini disponibili
+IMAGE_OUTPUT_FORMATS = {
+    "JPG (.jpg)": "jpg",
+    "PNG (.png)": "png",
+    "WebP (.webp)": "webp",
+    "BMP (.bmp)": "bmp",
+}
+
+def image_quality_label(val: int) -> str:
+    """Restituisce una descrizione testuale del livello di qualità (1-100)."""
+    if val >= 90: return f"{val}%  —  Massima qualità  (File molto grande)"
+    if val >= 75: return f"{val}%  —  Alta qualità  (Consigliato)"
+    if val >= 50: return f"{val}%  —  Qualità media  (Bilanciato)"
+    if val >= 25: return f"{val}%  —  Bassa qualità  (Alta compressione)"
+    return         f"{val}%  —  Qualità minima  (File molto piccolo)"
+
+def build_image_ffmpeg_args(fmt: str, quality: int) -> list:
+    """
+    Costruisce la lista di argomenti ffmpeg per la conversione immagini.
+    quality: 1-100 (100 = massima qualità)
+    """
+    if fmt == "jpg":
+        # ffmpeg -q:v: 2 = alta qualità, 31 = bassa. Rimappiamo 100→2, 1→31.
+        qv = max(2, min(31, 31 - int(quality * 29 / 100)))
+        return ["-q:v", str(qv)]
+    if fmt == "png":
+        # PNG: compression_level 0 = nessuna compressione (file grande), 9 = max compressione
+        # Invertiamo: qualità 100 → livello 0 (file grande/nitido), qualità 1 → livello 9
+        level = max(0, min(9, 9 - int(quality * 9 / 100)))
+        return ["-compression_level", str(level)]
+    if fmt == "webp":
+        return ["-c:v", "libwebp", "-quality", str(quality)]
+    if fmt == "bmp":
+        return ["-c:v", "bmp"]  # BMP non ha compressione
+    return []
 
 LICENSE_TEXT = """GNU GENERAL PUBLIC LICENSE
 Version 3, 29 June 2007
@@ -571,7 +614,7 @@ class ConvertThread(QThread):
 
     def __init__(self, jobs, params):
         super().__init__()
-        self.jobs   = jobs    # lista di (src, dst, src_info_or_None)
+        self.jobs   = jobs    # lista di (src, dst, src_info_or_None, is_raw_copy)
         self.params = params
         self._stop  = False
 
@@ -597,8 +640,6 @@ class ConvertThread(QThread):
         if dims is None:
             return ""
         dst_w, dst_h = dims
-        # Mantieni aspect ratio: scala per la dimensione minore
-        # -2 assicura che la dimensione sia divisibile per 2
         return f"scale={dst_w}:{dst_h}:flags=lanczos:force_original_aspect_ratio=decrease,pad={dst_w}:{dst_h}:(ow-iw)/2:(oh-ih)/2"
 
     def get_dst_dims(self, src_info, res_key):
@@ -618,6 +659,14 @@ class ConvertThread(QThread):
             return parts[:-1] + ["-progress", "pipe:1"] + [parts[-1]]
 
         mode    = self.params["mode"]
+
+        # ── modalità immagine ──
+        if mode == "image":
+            fmt     = self.params.get("img_fmt", "jpg")
+            quality = self.params.get("img_quality", 80)
+            img_args = build_image_ffmpeg_args(fmt, quality)
+            return ["ffmpeg", "-i", src] + img_args + [dst, "-y"]
+
         sample  = self.params["sample_rate"]
         hwaccel = self.params.get("hwaccel", True)
         res_key = self.params.get("resolution", "Mantieni originale")
@@ -656,14 +705,40 @@ class ConvertThread(QThread):
         ok = err = 0
         total = len(self.jobs)
 
-        for idx, (src, dst, src_info) in enumerate(self.jobs):
+        for idx, job in enumerate(self.jobs):
             if self._stop:
                 break
+
+            # job è una tupla (src, dst, src_info, is_raw_copy)
+            src, dst, src_info, is_raw_copy = job
 
             fname = os.path.basename(src)
             self.log_line.emit(f"\n{'─'*50}")
             self.log_line.emit(f"[{idx+1}/{total}] {fname}")
+            self.log_line.emit(f"  → {dst}")
 
+            os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
+
+            # ── Copia RAW (nessuna conversione) ──
+            if is_raw_copy:
+                self.log_line.emit("  [RAW] Copia originale intatta...")
+                try:
+                    shutil.copy2(src, dst)
+                    success = os.path.exists(dst) and os.path.getsize(dst) > 0
+                except Exception as e:
+                    self.log_line.emit(f"  ERRORE copia RAW: {e}")
+                    success = False
+                self.progress.emit(int((idx+1) / total * 100))
+                if success:
+                    ok += 1
+                    self.log_line.emit("  ✓ OK (RAW copiato)")
+                else:
+                    err += 1
+                    self.log_line.emit("  ✗ ERRORE copia RAW")
+                self.file_done.emit(fname, success)
+                continue
+
+            # ── Conversione FFmpeg ──
             # se AUTO, mostra i parametri calcolati
             if self.params.get("vqual") == "AUTO" and self.params["mode"] == "video":
                 res_key = self.params.get("resolution", "Mantieni originale")
@@ -671,11 +746,7 @@ class ConvertThread(QThread):
                 computed = self.get_video_opts(src_info, dst_w, dst_h)
                 self.log_line.emit(f"  [AUTO] {computed}")
 
-            self.log_line.emit(f"  → {dst}")
-
-            os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
-
-            duration = self.get_duration(src)
+            duration = self.get_duration(src) if self.params["mode"] != "image" else 0.0
             cmd = self.build_cmd(src, dst, src_info)
             self.log_line.emit("  $ " + " ".join(cmd))
 
@@ -704,6 +775,9 @@ class ConvertThread(QThread):
                              "out_time","total_size","dup_frames","drop_frames"]):
                         self.log_line.emit("  " + line)
                 proc.wait()
+                # Per le immagini non si usa -progress pipe:1, quindi non arriva progress=end
+                if self.params["mode"] == "image":
+                    self.progress.emit(int((idx+1) / total * 100))
                 success = (proc.returncode == 0 and
                            os.path.exists(dst) and os.path.getsize(dst) > 0)
             except Exception as e:
@@ -804,11 +878,15 @@ class MainWindow(QMainWindow):
         self.bg_type = QButtonGroup(self)
         self.rb_video = QRadioButton("Video + Audio")
         self.rb_audio = QRadioButton("Solo Audio")
+        self.rb_image = QRadioButton("Immagini")
         self.rb_video.setChecked(True)
         self.bg_type.addButton(self.rb_video, 0)
         self.bg_type.addButton(self.rb_audio, 1)
+        self.bg_type.addButton(self.rb_image, 2)
         self.rb_video.toggled.connect(self._on_type_changed)
-        row2.addWidget(self.rb_video); row2.addWidget(self.rb_audio)
+        self.rb_audio.toggled.connect(self._on_type_changed)
+        self.rb_image.toggled.connect(self._on_type_changed)
+        row2.addWidget(self.rb_video); row2.addWidget(self.rb_audio); row2.addWidget(self.rb_image)
         row2.addStretch()
         self.opts_layout.addLayout(row2)
         self._sep()
@@ -886,6 +964,76 @@ class MainWindow(QMainWindow):
         vlay.addLayout(res_row)
         self.opts_layout.addWidget(self.grp_video)
 
+        # ── STEP 3 (immagini): immagini ───────────────────────
+        self.grp_image = QGroupBox("STEP 3 — Immagini")
+        ilay = QVBoxLayout(self.grp_image)
+
+        ifmt_row = QHBoxLayout()
+        ifmt_row.addWidget(QLabel("Formato di output:"))
+        self.cmb_imgfmt = QComboBox()
+        self.cmb_imgfmt.addItems(IMAGE_OUTPUT_FORMATS.keys())
+        self.cmb_imgfmt.currentTextChanged.connect(self._on_imgfmt_changed)
+        ifmt_row.addWidget(self.cmb_imgfmt); ifmt_row.addStretch()
+        ilay.addLayout(ifmt_row)
+
+        # Slider qualità
+        ilay.addSpacing(4)
+        slider_header = QHBoxLayout()
+        slider_header.addWidget(QLabel("Qualità / Compressione:"))
+        slider_header.addStretch()
+        ilay.addLayout(slider_header)
+
+        # Etichette sinistra/destra con slider al centro
+        slider_row = QHBoxLayout()
+        lbl_low = QLabel("Bassa qualità\n(File piccolo)")
+        lbl_low.setStyleSheet("color:#cc7700; font-size:11px; text-align:right;")
+        lbl_low.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        lbl_low.setFixedWidth(110)
+        self.sld_imgqual = QSlider(Qt.Orientation.Horizontal)
+        self.sld_imgqual.setMinimum(1)
+        self.sld_imgqual.setMaximum(100)
+        self.sld_imgqual.setValue(82)
+        self.sld_imgqual.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.sld_imgqual.setTickInterval(10)
+        self.sld_imgqual.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.sld_imgqual.valueChanged.connect(self._on_imgqual_changed)
+        lbl_high = QLabel("Alta qualità\n(File grande)")
+        lbl_high.setStyleSheet("color:#44cc88; font-size:11px;")
+        lbl_high.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        lbl_high.setFixedWidth(110)
+        slider_row.addWidget(lbl_low)
+        slider_row.addWidget(self.sld_imgqual)
+        slider_row.addWidget(lbl_high)
+        ilay.addLayout(slider_row)
+
+        # Etichetta live con la descrizione qualità
+        self.lbl_imgqual_val = QLabel(image_quality_label(82))
+        self.lbl_imgqual_val.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_imgqual_val.setStyleSheet(
+            "color:#a0d0ff; font-size:12px; font-weight:bold; padding:4px;"
+        )
+        ilay.addWidget(self.lbl_imgqual_val)
+
+        # Avviso BMP (nessuna compressione)
+        self.lbl_bmp_warn = QLabel(
+            "ℹ  Il formato BMP non supporta la compressione — lo slider non ha effetto."
+        )
+        self.lbl_bmp_warn.setStyleSheet("color:#888888; font-size:11px; font-style:italic;")
+        self.lbl_bmp_warn.setVisible(False)
+        ilay.addWidget(self.lbl_bmp_warn)
+
+        # Nota RAW (mostrata solo in modalità cartella)
+        self.lbl_raw_note = QLabel(
+            "📁  I file RAW trovati nella cartella verranno copiati intatti in una "
+            "sottocartella separata  \"FOTO_RAW\"  accanto ai file convertiti."
+        )
+        self.lbl_raw_note.setWordWrap(True)
+        self.lbl_raw_note.setStyleSheet(
+            "color:#aaaaff; font-size:11px; font-style:italic; padding:4px 0;"
+        )
+        ilay.addWidget(self.lbl_raw_note)
+        self.opts_layout.addWidget(self.grp_image)
+
         # ── STEP 4: audio ─────────────────────────────────────
         self.grp_audio = QGroupBox("STEP 4 — Audio")
         alay = QVBoxLayout(self.grp_audio)
@@ -957,6 +1105,7 @@ class MainWindow(QMainWindow):
         # init
         self._on_container_changed(self.cmb_container.currentText())
         self._on_type_changed()
+        self._on_imgfmt_changed(self.cmb_imgfmt.currentText())
 
         # ── CONVERTI ──────────────────────────────────────────
         self.btn_go = QPushButton("▶  CONVERTI")
@@ -1009,25 +1158,58 @@ class MainWindow(QMainWindow):
     # ----------------------------------------------------------
     def _on_mode_changed(self):
         is_single = self.rb_single.isChecked()
+        is_image  = hasattr(self, "rb_image") and self.rb_image.isChecked()
+        is_video  = hasattr(self, "rb_video") and self.rb_video.isChecked()
+
+        # Numero step del nome dipende dal tipo di output
+        if is_video:
+            name_step = "STEP 5"
+        else:  # audio o immagine: un pannello in meno
+            name_step = "STEP 4"
+
         if is_single:
-            self.grp_name.setTitle("STEP 5 — Nome file output")
+            self.grp_name.setTitle(f"{name_step} \u2014 Nome file output")
             self.lbl_name.setText("Nome (senza estensione):")
             self.txt_name.setPlaceholderText("Lascia vuoto per mantenere il nome originale")
         else:
-            self.grp_name.setTitle("STEP 5 — Prefisso file output")
+            self.grp_name.setTitle(f"{name_step} \u2014 Prefisso file output")
             self.lbl_name.setText("Prefisso:")
             self.txt_name.setPlaceholderText("Lascia vuoto per nessun prefisso")
+
+        # Nota RAW visibile solo se modalit\u00e0 immagine + cartella
+        if hasattr(self, "lbl_raw_note"):
+            self.lbl_raw_note.setVisible(is_image and not is_single)
+
         self._update_cmd_preview()
 
     def _on_type_changed(self):
         is_video = self.rb_video.isChecked()
+        is_audio = self.rb_audio.isChecked()
+        is_image = self.rb_image.isChecked()
+        is_folder = self.rb_folder.isChecked()
+
         self.grp_video.setVisible(is_video)
-        self.grp_audio.setTitle("STEP 4 — Audio" if is_video else "STEP 3 — Audio")
+        self.grp_image.setVisible(is_image)
+        self.grp_audio.setVisible(not is_image)
+
+        # Nota RAW visibile solo in modalità cartella
+        if hasattr(self, "lbl_raw_note"):
+            self.lbl_raw_note.setVisible(is_image and is_folder)
+
+        # Numera gli step dinamicamente in base alla modalità
+        if is_video:
+            self.grp_audio.setTitle("STEP 4 — Audio")
+            name_step = "STEP 5"
+        elif is_audio:
+            self.grp_audio.setTitle("STEP 3 — Audio")
+            name_step = "STEP 4"
+        else:  # image
+            name_step = "STEP 4"
+
+        is_single = self.rb_single.isChecked()
         self.grp_name.setTitle(
-            ("STEP 5 — Nome file output" if self.rb_single.isChecked()
-             else "STEP 5 — Prefisso file output") if is_video else
-            ("STEP 4 — Nome file output" if self.rb_single.isChecked()
-             else "STEP 4 — Prefisso file output")
+            f"{name_step} — Nome file output" if is_single
+            else f"{name_step} — Prefisso file output"
         )
         self._update_cmd_preview()
 
@@ -1042,6 +1224,21 @@ class MainWindow(QMainWindow):
             )
         else:
             self._update_cmd_preview()
+
+    def _on_imgfmt_changed(self, fmt_label):
+        fmt = IMAGE_OUTPUT_FORMATS.get(fmt_label, "jpg")
+        is_bmp = (fmt == "bmp")
+        self.sld_imgqual.setEnabled(not is_bmp)
+        self.lbl_bmp_warn.setVisible(is_bmp)
+        if not is_bmp:
+            self._on_imgqual_changed(self.sld_imgqual.value())
+        else:
+            self.lbl_imgqual_val.setText("BMP — nessuna compressione")
+        self._update_cmd_preview()
+
+    def _on_imgqual_changed(self, val):
+        self.lbl_imgqual_val.setText(image_quality_label(val))
+        self._update_cmd_preview()
 
     def _on_container_changed(self, container):
         codecs = CONTAINER_CODECS.get(container, [])
@@ -1072,8 +1269,20 @@ class MainWindow(QMainWindow):
         if hasattr(self, "btn_manual") and self.btn_manual.isChecked():
             return
         btn = self.bg_vqual.checkedButton() if hasattr(self, "bg_vqual") else None
-        if btn and btn.text() == "AUTO":
+        if btn and btn.text() == "AUTO" and not (hasattr(self, "rb_image") and self.rb_image.isChecked()):
             return  # gestito da _on_vqual_changed
+
+        # ── modalità immagine ──
+        if hasattr(self, "rb_image") and self.rb_image.isChecked():
+            fmt_label = self.cmb_imgfmt.currentText() if hasattr(self, "cmb_imgfmt") else "JPG (.jpg)"
+            fmt  = IMAGE_OUTPUT_FORMATS.get(fmt_label, "jpg")
+            qual = self.sld_imgqual.value() if hasattr(self, "sld_imgqual") else 82
+            args = build_image_ffmpeg_args(fmt, qual)
+            args_str = " ".join(args)
+            cmd = f"ffmpeg -i {{INPUT}} {args_str} {{OUTPUT}}.{fmt} -y"
+            if hasattr(self, "txt_cmd"):
+                self.txt_cmd.setText(cmd.strip())
+            return
 
         mode    = "audio" if self.rb_audio.isChecked() else "video"
         acodec  = self.cmb_acodec.currentText()
@@ -1104,9 +1313,10 @@ class MainWindow(QMainWindow):
         self.txt_cmd.setReadOnly(not checked)
         self.lbl_hint.setVisible(checked)
         controls = (
-            [self.rb_video, self.rb_audio, self.rb_single, self.rb_folder,
+            [self.rb_video, self.rb_audio, self.rb_image, self.rb_single, self.rb_folder,
              self.cmb_container, self.cmb_vcodec, self.cmb_acodec,
-             self.cmb_sample, self.chk_hwaccel, self.cmb_res]
+             self.cmb_sample, self.chk_hwaccel, self.cmb_res,
+             self.cmb_imgfmt, self.sld_imgqual]
             + list(self.bg_vqual.buttons())
             + list(self.bg_aqual.buttons())
             + list(self.bg_gpu.buttons())
@@ -1128,6 +1338,12 @@ class MainWindow(QMainWindow):
     def _browse(self):
         if self.rb_folder.isChecked():
             path = QFileDialog.getExistingDirectory(self, "Seleziona cartella")
+        elif self.rb_image.isChecked():
+            exts_img = " ".join(f"*{e}" for e in sorted(IMAGE_EXTENSIONS))
+            exts_raw = " ".join(f"*{e}" for e in sorted(RAW_EXTENSIONS))
+            path, _ = QFileDialog.getOpenFileName(
+                self, "Seleziona immagine",
+                filter=f"Immagini ({exts_img});;File RAW ({exts_raw});;Tutti i file (*)")
         else:
             path, _ = QFileDialog.getOpenFileName(
                 self, "Seleziona file",
@@ -1141,7 +1357,13 @@ class MainWindow(QMainWindow):
 
     # ----------------------------------------------------------
     def _collect_params(self):
-        mode    = "audio" if self.rb_audio.isChecked() else "video"
+        if self.rb_image.isChecked():
+            mode = "image"
+        elif self.rb_audio.isChecked():
+            mode = "audio"
+        else:
+            mode = "video"
+
         vcodec  = self.cmb_vcodec.currentText()
         acodec  = self.cmb_acodec.currentText()
         vqual   = (self.bg_vqual.checkedButton().text()
@@ -1157,6 +1379,11 @@ class MainWindow(QMainWindow):
         video_ext = ext_map.get(self.cmb_container.currentText(), "mkv")
         audio_ext = AUDIO_ONLY_EXT.get(acodec, "wav")
 
+        # parametri immagine
+        img_fmt_label = self.cmb_imgfmt.currentText()
+        img_fmt       = IMAGE_OUTPUT_FORMATS.get(img_fmt_label, "jpg")
+        img_quality   = self.sld_imgqual.value()
+
         return {
             "mode":         mode,
             "video_ext":    video_ext,
@@ -1170,6 +1397,8 @@ class MainWindow(QMainWindow):
             "vqual":        vqual,
             "aqual":        aqual,
             "resolution":   res_key,
+            "img_fmt":      img_fmt,
+            "img_quality":  img_quality,
         }
 
     def _unique_path(self, dst):
@@ -1185,40 +1414,80 @@ class MainWindow(QMainWindow):
         path      = self.lbl_file.text()
         is_single = self.rb_single.isChecked()
         mode      = params["mode"]
-        out_ext   = params["audio_ext"] if mode == "audio" else params["video_ext"]
         prefix    = self.txt_name.text().strip()
         is_auto   = (params.get("vqual") == "AUTO" and mode == "video")
         jobs      = []
 
-        valid_exts = AUDIO_EXTENSIONS | VIDEO_EXTENSIONS
+        dummy_info = {
+            "codec":"h264","width":1920,"height":1080,
+            "fps":25.0,"bitrate":8_000_000,"depth":8,"profile":"0"
+        }
 
-        if is_single:
-            if not os.path.isfile(path): return []
-            stem = prefix if prefix else Path(path).stem
-            dst  = str(Path(path).parent / f"{stem}.{out_ext}")
-            # probe solo se AUTO
-            info = probe_video(path) if is_auto else {
-                "codec":"h264","width":1920,"height":1080,
-                "fps":25.0,"bitrate":8_000_000,"depth":8,"profile":"0"
-            }
-            jobs.append((path, self._unique_path(dst), info))
+        if mode == "image":
+            # ── modalità immagine ──────────────────────────────
+            img_fmt    = params["img_fmt"]
+            valid_exts = IMAGE_EXTENSIONS | RAW_EXTENSIONS
+
+            if is_single:
+                if not os.path.isfile(path): return []
+                ext_src = Path(path).suffix.lower()
+                if ext_src in RAW_EXTENSIONS:
+                    # file singolo RAW → non supportato in modalità singola
+                    # lo trattiamo come copia
+                    stem = prefix if prefix else Path(path).stem
+                    dst  = str(Path(path).parent / f"{stem}{ext_src}")
+                    jobs.append((path, self._unique_path(dst), dummy_info, True))
+                else:
+                    stem = prefix if prefix else Path(path).stem
+                    dst  = str(Path(path).parent / f"{stem}.{img_fmt}")
+                    jobs.append((path, self._unique_path(dst), dummy_info, False))
+            else:
+                if not os.path.isdir(path): return []
+                out_dir = os.path.join(path, "CONVERTITI_DISAGIO")
+                raw_dir = os.path.join(path, "FOTO_RAW")
+                for root_d, dirs, files in os.walk(path):
+                    # Salta le cartelle di output
+                    dirs[:] = [d for d in dirs
+                                if os.path.join(root_d, d) != out_dir
+                                and os.path.join(root_d, d) != raw_dir]
+                    for f in sorted(files):
+                        ext_f = Path(f).suffix.lower()
+                        if ext_f not in valid_exts: continue
+                        src  = os.path.join(root_d, f)
+                        rel  = os.path.relpath(root_d, path)
+                        stem = f"{prefix}_{Path(f).stem}" if prefix else Path(f).stem
+                        if ext_f in RAW_EXTENSIONS:
+                            # copia RAW nella cartella FOTO_RAW
+                            dst = os.path.join(raw_dir, rel, f"{Path(f).stem}{ext_f}")
+                            jobs.append((src, self._unique_path(dst), dummy_info, True))
+                        else:
+                            dst = os.path.join(out_dir, rel, f"{stem}.{img_fmt}")
+                            jobs.append((src, self._unique_path(dst), dummy_info, False))
         else:
-            if not os.path.isdir(path): return []
-            out_dir = os.path.join(path, "CONVERTITI_DISAGIO")
-            for root_d, _, files in os.walk(path):
-                if root_d.startswith(out_dir): continue
-                for f in sorted(files):
-                    if Path(f).suffix.lower() not in valid_exts: continue
-                    src  = os.path.join(root_d, f)
-                    stem = f"{prefix}_{Path(f).stem}" if prefix else Path(f).stem
-                    rel  = os.path.relpath(root_d, path)
-                    dst  = os.path.join(out_dir, rel, f"{stem}.{out_ext}")
-                    # probe per ogni file se AUTO
-                    info = probe_video(src) if is_auto else {
-                        "codec":"h264","width":1920,"height":1080,
-                        "fps":25.0,"bitrate":8_000_000,"depth":8,"profile":"0"
-                    }
-                    jobs.append((src, self._unique_path(dst), info))
+            # ── modalità video/audio ───────────────────────────
+            out_ext    = params["audio_ext"] if mode == "audio" else params["video_ext"]
+            valid_exts = AUDIO_EXTENSIONS | VIDEO_EXTENSIONS
+
+            if is_single:
+                if not os.path.isfile(path): return []
+                stem = prefix if prefix else Path(path).stem
+                dst  = str(Path(path).parent / f"{stem}.{out_ext}")
+                info = probe_video(path) if is_auto else dummy_info
+                jobs.append((path, self._unique_path(dst), info, False))
+            else:
+                if not os.path.isdir(path): return []
+                out_dir = os.path.join(path, "CONVERTITI_DISAGIO")
+                for root_d, dirs, files in os.walk(path):
+                    dirs[:] = [d for d in dirs
+                                if os.path.join(root_d, d) != out_dir]
+                    for f in sorted(files):
+                        if Path(f).suffix.lower() not in valid_exts: continue
+                        src  = os.path.join(root_d, f)
+                        stem = f"{prefix}_{Path(f).stem}" if prefix else Path(f).stem
+                        rel  = os.path.relpath(root_d, path)
+                        dst  = os.path.join(out_dir, rel, f"{stem}.{out_ext}")
+                        info = probe_video(src) if is_auto else dummy_info
+                        jobs.append((src, self._unique_path(dst), info, False))
         return jobs
 
     # ----------------------------------------------------------
@@ -1250,19 +1519,34 @@ class MainWindow(QMainWindow):
         else:
             params.pop("manual_cmd", None)
 
-        lines = [f"File da convertire: {len(jobs)}"]
-        if params["mode"] == "video":
+        mode = params["mode"]
+        raw_jobs   = sum(1 for j in jobs if j[3])
+        conv_jobs  = len(jobs) - raw_jobs
+
+        lines = []
+        if mode == "image":
+            if conv_jobs:
+                lines.append(f"Immagini da convertire: {conv_jobs}")
+            if raw_jobs:
+                lines.append(f"File RAW da copiare in FOTO_RAW: {raw_jobs}")
             lines += [
-                f"Encoder GPU: {params['gpu']}",
-                f"HW decoding: {'Sì' if params['hwaccel'] else 'No'}",
-                f"Codec video: {params['vcodec']} — {params['vqual']}",
-                f"Container: .{params['video_ext']}",
-                f"Risoluzione: {params['resolution']}",
+                f"Formato output: .{params['img_fmt'].upper()}",
+                f"Qualità: {image_quality_label(params['img_quality'])}",
             ]
-        lines += [
-            f"Codec audio: {params['acodec']} — {params['aqual']}",
-            f"Sample rate: {params['sample_rate']}",
-        ]
+        else:
+            lines.append(f"File da convertire: {len(jobs)}")
+            if mode == "video":
+                lines += [
+                    f"Encoder GPU: {params['gpu']}",
+                    f"HW decoding: {'Sì' if params['hwaccel'] else 'No'}",
+                    f"Codec video: {params['vcodec']} — {params['vqual']}",
+                    f"Container: .{params['video_ext']}",
+                    f"Risoluzione: {params['resolution']}",
+                ]
+            lines += [
+                f"Codec audio: {params['acodec']} — {params['aqual']}",
+                f"Sample rate: {params['sample_rate']}",
+            ]
         pfx = self.txt_name.text().strip()
         if pfx and not self.rb_single.isChecked():
             lines.append(f"Prefisso: {pfx}_")
