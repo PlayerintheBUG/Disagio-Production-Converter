@@ -1,6 +1,6 @@
 # 🎬 Disagio Production Converter
 
-Un convertitore multimediale ad alte prestazioni, ottimizzato per i flussi di lavoro di post-produzione della **Disagio Production**. Sviluppato in Python con un'interfaccia grafica moderna in PyQt6, sfrutta la potenza di FFmpeg per garantire conversioni rapide, stabili e fedeli all'originale.
+Un convertitore multimediale ad alte prestazioni, Sviluppato in Python con un'interfaccia grafica moderna in PyQt6, sfrutta la potenza di FFmpeg per garantire conversioni rapide, stabili e fedeli all'originale.
 
 ---
 
