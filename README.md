@@ -44,6 +44,23 @@ Avvia l'applicazione:
     python disagio_converter.py
 
 
-## 📜 Licenza
+## 🚀 Download (.exe per Windows)
+Puoi scaricare l'eseguibile per Windows già pronto all'uso, senza dover installare Python o FFmpeg, direttamente dalla sezione **[Releases](https://github.com/PlayerintheBUG/Disagio-Production-Converter/releases)** sulla destra di questa pagina.
 
-Questo progetto è software libero rilasciato sotto i termini della licenza **GNU GPL v3 (GNU General Public License v3.0)**. Sei libero di modificare, distribuire e condividere il software, a patto che ogni opera derivata mantenga la stessa licenza open source.
+### Nota per l'uso dell'eseguibile:
+L'eseguibile integra al suo interno i binari di FFmpeg e FFprobe per funzionare in modalità standalone.
+
+---
+
+## 🛠️ Come eseguirlo dal codice sorgente
+Se preferisci non usare l'eseguibile e lanciarlo tramite Python:
+
+1. Clona il repository:
+   ```bash
+   git clone [https://github.com/PlayerintheBUG/Disagio-Production-Converter.git](https://github.com/PlayerintheBUG/Disagio-Production-Converter.git)
+
+---
+
+## ⚖️ Licenza e Note Legali
+* **Codice Sorgente:** Questo progetto è distribuito sotto licenza **GNU GPL v3**.
+* **FFmpeg / FFprobe:** Questo software include e utilizza i binari compilati di FFmpeg e FFprobe (disponibili su [ffmpeg.org](https://ffmpeg.org/)), distribuiti sotto licenza GNU LGPLv2.1 / GPLv2+. Il codice sorgente originale e non modificato di FFmpeg può essere scaricato direttamente dal loro sito ufficiale.
