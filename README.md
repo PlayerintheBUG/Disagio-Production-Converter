@@ -51,15 +51,6 @@ Puoi scaricare l'eseguibile per Windows già pronto all'uso, senza dover install
 L'eseguibile integra al suo interno i binari di FFmpeg e FFprobe per funzionare in modalità standalone.
 
 ---
-
-## 🛠️ Come eseguirlo dal codice sorgente
-Se preferisci non usare l'eseguibile e lanciarlo tramite Python:
-
-1. Clona il repository:
-   ```bash
-   git clone [https://github.com/PlayerintheBUG/Disagio-Production-Converter.git](https://github.com/PlayerintheBUG/Disagio-Production-Converter.git)
-
----
 ⚖️ Note Legali e Conformità Licenze (GPLv3)
 In conformità con la GNU General Public License v3, si dichiara quanto segue:
 
