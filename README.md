@@ -30,7 +30,7 @@ Il software sfrutta le librerie di sistema per garantire le massime prestazioni.
 
 Assicurati di avere ffmpeg e ffprobe installati:
 
- # Esempio su Nobara/Fedora:
+  Esempio su Nobara/Fedora:
     sudo dnf install ffmpeg ffmpeg-free-devel
 
    Clona il repository e installa le dipendenze Python:
