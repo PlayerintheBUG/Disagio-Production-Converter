@@ -4,21 +4,26 @@ Un convertitore multimediale ad alte prestazioni, Sviluppato in Python con un'in
 
 ---
 
-## ✨ Caratteristiche Principali
+✨ Caratteristiche Principali
 
-### 🧠 Automazione Intelligente (v1.1.0)
-* **Decisionale AUTO:** Analizza i metadati del file sorgente tramite `ffprobe` e calcola dinamicamente il valore di CQ (Constant Quality) ideale. Bilancia automaticamente il peso del file e la qualità visiva senza interventi manuali.
-* **Downscale con Padding:** Ridimensiona i video utilizzando l'algoritmo **Lanczos**, calcolando il padding al millesimo per mantenere l'aspect ratio originale senza deformare l'immagine.
+🧠 Automazione e Gestione Intelligente
+- **Matrice Decisionale AUTO:** Il convertitore analizza istantaneamente i metadati del file sorgente tramite ffprobe e calcola dinamicamente il valore di CQ (Constant Quality) ideale. Questo permette di bilanciare in automatico il peso finale del file e la fedeltà visiva, senza richiedere interventi manuali o competenze tecniche.
+- **Downscale Avanzato con Padding:** Ridimensiona i video sfruttando l'altissima qualità del filtro Lanczos. Il software calcola al millesimo i margini geometrici (padding) per preservare l'aspect ratio originale, evitando qualsiasi tipo di distorsione o allungamento dell'immagine.
 
-### 🛡️ Stabilità ed Efficienza
-* **Interfaccia Anti-Freeze:** Sfrutta il multithreading nativo (`QThread`). Il motore di FFmpeg lavora in isolamento: la UI rimane fluida, risponde ai comandi e aggiorna la barra di avanzamento in tempo reale anche nei render più pesanti.
-* **Analisi Robusta del Flusso:** Gestione avanzata dei metadati per evitare crash su file complessi, tracce audio mancanti o video a framerate variabile (VFR).
+📸 Elaborazione e Conversione Immagini
+- **Convertitore Grafico Multiformato:** Espande le funzionalità del software oltre il comparto video, introducendo la gestione nativa dei file grafici. Consente di convertire qualsiasi immagine sorgente nei formati JPG, PNG, WebP e BMP.
+- **Profili di Compressione Dedicati:** Ottimizza lo spazio su disco o la qualità visiva grazie a algoritmi di compressione specifici per WebP e JPG, permettendo di scegliere tra il massimo risparmio di spazio o la conservazione millimetrica dei dettagli.
+- **Interfaccia Dinamica:** La GUI si adatta automaticamente rilevando il tipo di file caricato, mostrando all'utente solo i filtri, i parametri e le opzioni pertinenti alla modalità Video o alla modalità Immagine.
 
-### 🚀 Accelerazione Hardware
-Integrazione nativa con i principali encoder para sfruttare al massimo CPU e GPU moderne:
-* **NVIDIA NVENC** (Architetture GeForce RTX/GTX)
-* **AMD AMF** / **Intel QSV**
-* Codifica software ottimizzata via CPU
+🛡️ Stabilità ed Efficienza di Sistema
+- **Interfaccia Grafica Anti-Freeze:** Sfrutta l'architettura in multithreading nativo (QThread). Il motore di rendering lavora in totale isolamento in background: l'interfaccia utente (PyQt6) rimane fluida, risponde istantaneamente ai comandi e aggiorna la barra di avanzamento in tempo reale anche durante le conversioni più pesanti.
+- **Analisi Robusta dei Flussi:** Gestione avanzata dei flussi multimediali per prevenire crash ed errori critici su file danneggiati o complessi, tracce audio mancanti, flussi sottotitoli o video a framerate variabile (VFR).
+
+🚀 Accelerazione Hardware Avanzata
+Integrazione profonda con i principali encoder di sistema per sfruttare al massimo la potenza computazionale di CPU e GPU moderne, riducendo drasticamente i tempi di esportazione:
+- **NVIDIA NVENC:** Sfruttamento dei core dedicati delle schede grafiche GeForce RTX / GTX.
+- **AMD AMF & Intel QSV:** Supporto completo alle tecnologie di accelerazione hardware Radeon e Intel Graphics.
+- **Codifica Software Ottimizzata:** Pipeline di elaborazione via CPU efficiente e ottimizzata per i sistemi che non dispongono di una GPU dedicata.
 
 ---
 🚀 Installazione e Utilizzo
