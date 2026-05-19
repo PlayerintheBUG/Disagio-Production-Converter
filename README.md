@@ -21,33 +21,41 @@ Integrazione nativa con i principali encoder para sfruttare al massimo CPU e GPU
 * Codifica software ottimizzata via CPU
 
 ---
-📦 Disponibilità su Windows (v1.1.0)
+🚀 Installazione e Utilizzo
 
-È ora disponibile l'eseguibile nativo per Windows! Non è più necessario installare Python o dipendenze complesse: il software è stato impacchettato in un unico file .exe che include già il motore di conversione.
-Come iniziare su Windows:
-    Vai nella sezione Releases.
-    Scarica il file Disagio_Production_Converter.exe dalla sezione Assets.
-    Avvia l'eseguibile con un doppio clic.
-    Nota: Il file include già ffmpeg e ffprobe al suo interno, garantendo il pieno supporto alla conversione multimediale senza configurazioni aggiuntive. L'interfaccia è stata ottimizzata per una       massima fluidità su sistemi Windows 10/11.
+Il Disagio Production Converter è progettato per essere versatile. Scegli la procedura adatta al tuo sistema operativo:
+🐧 Per utenti Linux (Nobara/Arch/Ubuntu)
+
+Il software sfrutta le librerie di sistema per garantire le massime prestazioni.
+
+Assicurati di avere ffmpeg e ffprobe installati:
+
+ # Esempio su Nobara/Fedora:
+    sudo dnf install ffmpeg ffmpeg-free-devel
+
+    Clona il repository e installa le dipendenze Python:
+    Bash
+
+    git clone https://github.com/PlayerintheBUG/Disagio-Production-Converter.git
+    cd Disagio-Production-Converter
+    pip install PyQt6
+
+Avvia l'applicazione:
+
+    python disagio_converter.py
+
+🪟 Per utenti Windows 10/11
+
+Non è necessaria alcuna configurazione. Abbiamo impacchettato tutto in un unico file eseguibile.
+
+    Vai nella sezione Releases di questo repository.
+
+Scarica l'ultima versione disponibile (Disagio_Production_Converter.exe).
+
+Avvia il file con un doppio clic.
+
+Nota: L'eseguibile contiene già al suo interno ffmpeg e ffprobe, quindi è pronto all'uso immediato senza bisogno di installare Python o altri componenti aggiuntivi.
 
 ## 📜 Licenza
 
 Questo progetto è software libero rilasciato sotto i termini della licenza **GNU GPL v3 (GNU General Public License v3.0)**. Sei libero di modificare, distribuire e condividere il software, a patto che ogni opera derivata mantenga la stessa licenza open source.
-
----
-
-## 🛠️ Installazione e Utilizzo
-
-> 💻 **Ambiente di Sviluppo:** Questo software è stato sviluppato e testato nativamente su **Nobara 43** con ambiente desktop **KDE Plasma**.
-
-### 1. Requisiti di sistema
-Assicurati che `ffmpeg` e `ffprobe` siano installati nel sistema. Su Nobara puoi verificarlo o installarli da terminale con:
-```
-sudo dnf install ffmpeg ffmpeg-free-devel
-```
-### 2. Clonazione e Configurazione
-Esegui questi comandi nel terminale per scaricare il progetto e installare la libreria grafica necessaria.
-```bash
-git clone https://github.com/PlayerintheBUG/Disagio-Production-Converter.git
-cd Disagio-Production-Converter
-pip install PyQt6
