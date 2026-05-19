@@ -60,23 +60,26 @@ Se preferisci non usare l'eseguibile e lanciarlo tramite Python:
    git clone [https://github.com/PlayerintheBUG/Disagio-Production-Converter.git](https://github.com/PlayerintheBUG/Disagio-Production-Converter.git)
 
 ---
-⚖️ Licenza e Note Legali
+⚖️ Note Legali e Conformità Licenze (GPLv3)
+In conformità con la GNU General Public License v3, si dichiara quanto segue:
 
-**Codice sorgente del progetto**  
-Questo progetto è distribuito sotto licenza **GNU General Public License v3.0** (GPLv3).  
+Licenza del software
+“Disagio Production Converter” è distribuito interamente sotto GNU GPLv3.
 Il codice sorgente completo è disponibile su questo repository GitHub.
+FFmpeg e ffprobe
+Questo eseguibile include i binari ffmpeg.exe e ffprobe.exe (versione 8.1.1 full_build).
+I binari sono originali e non modificati.
+Sono stati scaricati dalle build ufficiali di gyan.dev.
+FFmpeg è rilasciato sotto GNU GPLv3 per via dei codec GPL inclusi (x264, x265, ecc.).
 
-**FFmpeg e FFprobe**  
-L'eseguibile Windows include al suo interno i binari di **FFmpeg** e **ffprobe** (build full) per funzionare in modalità completamente standalone.
+Corresponding Source di FFmpeg
+Il codice sorgente completo corrispondente alla versione 8.1.1 può essere trovato qui:
+Commit esatto usato da gyan.dev:
+→ https://github.com/FFmpeg/FFmpeg/commit/239f2c733d
+Pagina generale di download sorgenti: https://ffmpeg.org/download.html
 
-- I binari provengono dalle build ufficiali **[gyan.dev](https://www.gyan.dev/ffmpeg/builds/)** (versione full GPLv3).
-- FFmpeg è rilasciato sotto **GNU General Public License v3** a causa dell'inclusione di codec e librerie sotto licenza GPL (es. x264, x265, ecc.).
-- **Nessuna modifica** è stata apportata ai binari originali di FFmpeg.
+Note aggiuntive
+FFmpeg viene eseguito come processo esterno (subprocess).
+Nessuna modifica è stata apportata ai binari.
 
-**Come ottenere il codice sorgente di FFmpeg**  
-Puoi scaricare il codice sorgente corrispondente alla versione utilizzata qui:  
-→ [https://ffmpeg.org/download.html](https://ffmpeg.org/download.html) (sezione "Source code")  
-
-Oppure clonando direttamente il repository ufficiale:  
-```bash
-git clone https://git.ffmpeg.org/ffmpeg.git
+Per qualsiasi chiarimento sulle licenze, apri pure una Issue su questo repository.
