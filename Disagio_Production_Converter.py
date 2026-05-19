@@ -2,8 +2,17 @@
 # ============================================================
 #  disagio_converter.py  —  DISAGIO PRODUCTION CONVERTER
 #  Converte video e audio con GUI PyQt6 + terminale in RT
-#  Dipendenze: PyQt6, ffmpeg
-#  Installazione: pip install PyQt6 --user
+# ============================================================
+#  Copyright (C) 2026 PlayerintheBUG
+#
+#  Questo programma è software libero: puoi ridistribuirlo e/o
+#  modificarlo secondo i termini della Licenza Pubblica Generica
+#  GNU (GPL) versione 3, come pubblicata dalla Free Software Foundation.
+#
+#  Questo programma è distribuito nella speranza che sia utile,
+#  ma SENZA ALCUNA GARANZIA; senza nemmeno la garanzia implicita
+#  di COMMERCIABILITÀ o IDONEITÀ PER UNO SCOPO PARTICOLARE.
+#  Vedi la licenza GNU GPL v3 per maggiori dettagli.
 # ============================================================
 
 import sys
