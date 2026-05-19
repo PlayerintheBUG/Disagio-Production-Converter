@@ -72,11 +72,6 @@ I binari sono originali e non modificati.
 Sono stati scaricati dalle build ufficiali di gyan.dev.
 FFmpeg è rilasciato sotto GNU GPLv3 per via dei codec GPL inclusi (x264, x265, ecc.).
 
-Corresponding Source di FFmpeg
-Il codice sorgente completo corrispondente alla versione 8.1.1 può essere trovato qui:
-Commit esatto usato da gyan.dev:
-→ https://github.com/FFmpeg/FFmpeg/commit/239f2c733d
-Pagina generale di download sorgenti: https://ffmpeg.org/download.html
 
 Note aggiuntive
 FFmpeg viene eseguito come processo esterno (subprocess).
