@@ -21,6 +21,14 @@ Integrazione nativa con i principali encoder para sfruttare al massimo CPU e GPU
 * Codifica software ottimizzata via CPU
 
 ---
+📦 Disponibilità su Windows (v1.1.0)
+
+È ora disponibile l'eseguibile nativo per Windows! Non è più necessario installare Python o dipendenze complesse: il software è stato impacchettato in un unico file .exe che include già il motore di conversione.
+Come iniziare su Windows:
+    Vai nella sezione Releases.
+    Scarica il file Disagio_Production_Converter.exe dalla sezione Assets.
+    Avvia l'eseguibile con un doppio clic.
+    Nota: Il file include già ffmpeg e ffprobe al suo interno, garantendo il pieno supporto alla conversione multimediale senza configurazioni aggiuntive. L'interfaccia è stata ottimizzata per una       massima fluidità su sistemi Windows 10/11.
 
 ## 📜 Licenza
 
