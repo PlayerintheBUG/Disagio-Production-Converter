@@ -33,9 +33,8 @@ Assicurati di avere ffmpeg e ffprobe installati:
  # Esempio su Nobara/Fedora:
     sudo dnf install ffmpeg ffmpeg-free-devel
 
-    Clona il repository e installa le dipendenze Python:
-    Bash
-
+   Clona il repository e installa le dipendenze Python:
+    
     git clone https://github.com/PlayerintheBUG/Disagio-Production-Converter.git
     cd Disagio-Production-Converter
     pip install PyQt6
