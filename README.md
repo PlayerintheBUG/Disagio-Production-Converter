@@ -43,6 +43,7 @@ Assicurati di avere `ffmpeg` e `ffprobe` installati (Esempio su Fedora):
 sudo dnf install ffmpeg ffmpeg-free-devel
 ```
 Scaricare dalla sezione Release il file Disagio_Production_Converter.py
+
 🪟 Per utenti Windows (.exe)
 Puoi scaricare l'eseguibile per Windows già pronto all'uso, senza dover installare Python o FFmpeg, direttamente dalla sezione Releases sulla destra di questa pagina.
 
