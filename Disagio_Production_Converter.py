@@ -288,13 +288,54 @@ IMAGE_OUTPUT_FORMATS = {
     "WebP (.webp)": "webp",
     "BMP (.bmp)": "bmp",
 }
+_IMG_QUAL_LABELS = {
+    90: {
+        "it": "Massima qualità  (File molto grande)",
+        "en": "Maximum quality  (Very large file)",
+        "de": "Maximale Qualität  (Sehr große Datei)",
+        "es": "Calidad máxima  (Archivo muy grande)",
+        "doge": "much quality. very big file wow",
+    },
+    75: {
+        "it": "Alta qualità  (Consigliato)",
+        "en": "High quality  (Recommended)",
+        "de": "Hohe Qualität  (Empfohlen)",
+        "es": "Alta calidad  (Recomendado)",
+        "doge": "good quality wow (do this)",
+    },
+    50: {
+        "it": "Qualità media  (Bilanciato)",
+        "en": "Medium quality  (Balanced)",
+        "de": "Mittlere Qualität  (Ausgewogen)",
+        "es": "Calidad media  (Equilibrado)",
+        "doge": "medium quality. such balance.",
+    },
+    25: {
+        "it": "Bassa qualità  (Alta compressione)",
+        "en": "Low quality  (High compression)",
+        "de": "Niedrige Qualität  (Hohe Komprimierung)",
+        "es": "Baja calidad  (Alta compresión)",
+        "doge": "smol quality. much squish.",
+    },
+    0: {
+        "it": "Qualità minima  (File molto piccolo)",
+        "en": "Minimum quality  (Very small file)",
+        "de": "Minimale Qualität  (Sehr kleine Datei)",
+        "es": "Calidad mínima  (Archivo muy pequeño)",
+        "doge": "tiny quality. very smol file. wow",
+    },
+}
+
 def image_quality_label(val: int) -> str:
-    """Restituisce una descrizione testuale del livello di qualità (1-100)."""
-    if val >= 90: return f"{val}%  —  Massima qualità  (File molto grande)"
-    if val >= 75: return f"{val}%  —  Alta qualità  (Consigliato)"
-    if val >= 50: return f"{val}%  —  Qualità media  (Bilanciato)"
-    if val >= 25: return f"{val}%  —  Bassa qualità  (Alta compressione)"
-    return         f"{val}%  —  Qualità minima  (File molto piccolo)"
+    """Return a localised quality description for the given value (1-100)."""
+    for threshold in (90, 75, 50, 25):
+        if val >= threshold:
+            d = _IMG_QUAL_LABELS[threshold]
+            txt = d.get(_LANG, d["it"])
+            return f"{val}%  —  {txt}"
+    d = _IMG_QUAL_LABELS[0]
+    txt = d.get(_LANG, d["it"])
+    return f"{val}%  —  {txt}"
 def build_image_ffmpeg_args(fmt: str, quality: int) -> list:
     """
     Costruisce la lista di argomenti ffmpeg per la conversione immagini.
@@ -492,6 +533,618 @@ def auto_compute_cq(src_info: dict, codec_dst: str, gpu: str,
         p = "slow" if cq <= 18 else ("medium" if cq <= 28 else "faster")
         return f"-c:v libx265 -preset {p} -crf {cq} -pix_fmt {pix}"
     return ""
+
+# ============================================================
+#  TRADUZIONI / TRANSLATIONS / ÜBERSETZUNGEN / TRADUCCIONES
+# ============================================================
+LANGUAGES = {
+    "Italiano 🇮🇹":  "it",
+    "English 🇬🇧":   "en",
+    "Deutsch 🇩🇪":   "de",
+    "Español 🇪🇸":   "es",
+    "Doge 🐕":        "doge",
+}
+
+TRANSLATIONS = {
+    # ── App title ──────────────────────────────────────────
+    "app_title": {
+        "it":   "DISAGIO PRODUCTION CONVERTER",
+        "en":   "DISAGIO PRODUCTION CONVERTER",
+        "de":   "DISAGIO PRODUCTION CONVERTER",
+        "es":   "DISAGIO PRODUCTION CONVERTER",
+        "doge": "DISAGIO PRODUCTION CONVERTER wow",
+    },
+    # ── Toolbar ────────────────────────────────────────────
+    "lbl_theme": {
+        "it": "Tema:", "en": "Theme:", "de": "Design:", "es": "Tema:",
+        "doge": "such color:",
+    },
+    "btn_edit_theme": {
+        "it": " Modifica Tema ", "en": " Edit Theme ", "de": " Design bearbeiten ",
+        "es": " Editar Tema ", "doge": " wow theme edit ",
+    },
+    "btn_edit_theme_tip": {
+        "it": "Modifica o crea un tema personalizzato",
+        "en": "Edit or create a custom theme",
+        "de": "Design bearbeiten oder erstellen",
+        "es": "Editar o crear un tema personalizado",
+        "doge": "much customize wow",
+    },
+    "btn_license": {
+        "it": "⚖  GPL v3", "en": "⚖  GPL v3", "de": "⚖  GPL v3",
+        "es": "⚖  GPL v3", "doge": "⚖  law paper",
+    },
+    "btn_license_tip": {
+        "it": "Visualizza la licenza GNU GPL v3",
+        "en": "View the GNU GPL v3 license",
+        "de": "GNU GPL v3 Lizenz anzeigen",
+        "es": "Ver la licencia GNU GPL v3",
+        "doge": "such legal, very free",
+    },
+
+
+    # ── Step 1 ─────────────────────────────────────────────
+    "step1_title": {
+        "it": "STEP 1 — Sorgente",
+        "en": "STEP 1 — Source",
+        "de": "SCHRITT 1 — Quelle",
+        "es": "PASO 1 — Fuente",
+        "doge": "STEP 1 — such file",
+    },
+    "rb_single": {
+        "it": "File singolo", "en": "Single file", "de": "Einzelne Datei",
+        "es": "Archivo único", "doge": "one file, wow",
+    },
+    "rb_folder": {
+        "it": "Cartella intera", "en": "Entire folder", "de": "Ganzer Ordner",
+        "es": "Carpeta entera", "doge": "many file, very folder",
+    },
+    "lbl_no_file": {
+        "it": "Nessun file selezionato",
+        "en": "No file selected",
+        "de": "Keine Datei ausgewählt",
+        "es": "Ningún archivo seleccionado",
+        "doge": "no file. such empty. wow",
+    },
+    "btn_browse": {
+        "it": "Sfoglia…", "en": "Browse…", "de": "Durchsuchen…",
+        "es": "Examinar…", "doge": "pls find…",
+    },
+    # ── Step 2 ─────────────────────────────────────────────
+    "step2_title": {
+        "it": "STEP 2 — Tipo output",
+        "en": "STEP 2 — Output type",
+        "de": "SCHRITT 2 — Ausgabetyp",
+        "es": "PASO 2 — Tipo de salida",
+        "doge": "STEP 2 — what output? wow",
+    },
+    "rb_video": {
+        "it": "Video + Audio", "en": "Video + Audio", "de": "Video + Audio",
+        "es": "Video + Audio", "doge": "Video + sound wow",
+    },
+    "rb_audio": {
+        "it": "Solo Audio", "en": "Audio only", "de": "Nur Audio",
+        "es": "Solo Audio", "doge": "only sound, very audio",
+    },
+    "rb_image": {
+        "it": "Immagini", "en": "Images", "de": "Bilder",
+        "es": "Imágenes", "doge": "much picture, wow",
+    },
+    # ── Step 3 video ───────────────────────────────────────
+    "grp_video": {
+        "it": "STEP 3 — Video", "en": "STEP 3 — Video",
+        "de": "SCHRITT 3 — Video", "es": "PASO 3 — Video",
+        "doge": "STEP 3 — such video",
+    },
+    "lbl_gpu": {
+        "it": "Encoder GPU:", "en": "GPU Encoder:", "de": "GPU-Encoder:",
+        "es": "Codificador GPU:", "doge": "fast chip:",
+    },
+    "chk_hwaccel": {
+        "it": "Accelerazione hardware decodifica  (-hwaccel auto)",
+        "en": "Hardware decode acceleration  (-hwaccel auto)",
+        "de": "Hardware-Dekodierungsbeschleunigung  (-hwaccel auto)",
+        "es": "Aceleración de decodificación por hardware  (-hwaccel auto)",
+        "doge": "vroom hardware go fast (-hwaccel auto)",
+    },
+    "lbl_container": {
+        "it": "Container:", "en": "Container:", "de": "Container:",
+        "es": "Contenedor:", "doge": "box:",
+    },
+    "lbl_vcodec": {
+        "it": "Codec video:", "en": "Video codec:", "de": "Video-Codec:",
+        "es": "Codec de video:", "doge": "such encode:",
+    },
+    "lbl_vqual": {
+        "it": "Qualità video:", "en": "Video quality:", "de": "Videoqualität:",
+        "es": "Calidad de video:", "doge": "how good video?:",
+    },
+    "qual_high": {
+        "it": "Alto", "en": "High", "de": "Hoch", "es": "Alto", "doge": "very wow",
+    },
+    "qual_mid": {
+        "it": "Medio", "en": "Medium", "de": "Mittel", "es": "Medio", "doge": "much ok",
+    },
+    "qual_low": {
+        "it": "Basso", "en": "Low", "de": "Niedrig", "es": "Bajo", "doge": "smol",
+    },
+    "qual_auto": {
+        "it": "AUTO", "en": "AUTO", "de": "AUTO", "es": "AUTO", "doge": "DOGE",
+    },
+    "lbl_auto_warn": {
+        "it": "⚠ Il sistema AUTO è una stima — può commettere errori su sorgenti atipici",
+        "en": "⚠ AUTO mode is an estimate — may have errors on atypical sources",
+        "de": "⚠ AUTO ist eine Schätzung — bei atypischen Quellen können Fehler auftreten",
+        "es": "⚠ El modo AUTO es una estimación — puede tener errores en fuentes atípicas",
+        "doge": "⚠ AUTO is guess. much estimate. maybe wrong. wow",
+    },
+    "lbl_resolution": {
+        "it": "Risoluzione output:", "en": "Output resolution:", "de": "Ausgabeauflösung:",
+        "es": "Resolución de salida:", "doge": "how many pixel?:",
+    },
+    "lbl_res_note": {
+        "it": "<small style='color:#666688'>  Aspect ratio originale preservato  |  filtro: lanczos</small>",
+        "en": "<small style='color:#666688'>  Original aspect ratio preserved  |  filter: lanczos</small>",
+        "de": "<small style='color:#666688'>  Originales Seitenverhältnis beibehalten  |  Filter: lanczos</small>",
+        "es": "<small style='color:#666688'>  Relación de aspecto original preservada  |  filtro: lanczos</small>",
+        "doge": "<small style='color:#666688'>  keep shape wow  |  such lanczos filter</small>",
+    },
+    # ── Step 3 images ──────────────────────────────────────
+    "grp_image": {
+        "it": "STEP 3 — Immagini", "en": "STEP 3 — Images",
+        "de": "SCHRITT 3 — Bilder", "es": "PASO 3 — Imágenes",
+        "doge": "STEP 3 — much picture",
+    },
+    "lbl_imgfmt": {
+        "it": "Formato di output:", "en": "Output format:", "de": "Ausgabeformat:",
+        "es": "Formato de salida:", "doge": "what picture box?:",
+    },
+    "lbl_imgqual_header": {
+        "it": "Qualità / Compressione:", "en": "Quality / Compression:",
+        "de": "Qualität / Komprimierung:", "es": "Calidad / Compresión:",
+        "doge": "how squish?:",
+    },
+    "lbl_img_low": {
+        "it": "Bassa qualità\n(File piccolo)", "en": "Low quality\n(Small file)",
+        "de": "Niedrige Qualität\n(Kleine Datei)", "es": "Baja calidad\n(Archivo pequeño)",
+        "doge": "smol quality\n(tiny file)",
+    },
+    "lbl_img_high": {
+        "it": "Alta qualità\n(File grande)", "en": "High quality\n(Large file)",
+        "de": "Hohe Qualität\n(Große Datei)", "es": "Alta calidad\n(Archivo grande)",
+        "doge": "wow quality\n(big file)",
+    },
+    "lbl_bmp_warn": {
+        "it": "ℹ  Il formato BMP non supporta la compressione — lo slider non ha effetto.",
+        "en": "ℹ  BMP format does not support compression — the slider has no effect.",
+        "de": "ℹ  Das BMP-Format unterstützt keine Komprimierung — der Schieberegler hat keine Wirkung.",
+        "es": "ℹ  El formato BMP no admite compresión — el control deslizante no tiene efecto.",
+        "doge": "ℹ  BMP no squish. slider do nothing. wow.",
+    },
+    "lbl_raw_note": {
+        "it": "📁  I file RAW trovati nella cartella verranno copiati intatti in una sottocartella separata  \"FOTO_RAW\"  accanto ai file convertiti.",
+        "en": "📁  RAW files found in the folder will be copied intact to a separate subfolder  \"FOTO_RAW\"  next to the converted files.",
+        "de": "📁  RAW-Dateien im Ordner werden unverändert in einen separaten Unterordner  \"FOTO_RAW\"  neben den konvertierten Dateien kopiert.",
+        "es": "📁  Los archivos RAW encontrados en la carpeta se copiarán intactos en una subcarpeta separada  \"FOTO_RAW\"  junto a los archivos convertidos.",
+        "doge": "📁  RAW file found. very copy. much intact. go to FOTO_RAW folder wow.",
+    },
+    # ── Step 4 audio ───────────────────────────────────────
+    "grp_audio_v": {
+        "it": "STEP 4 — Audio", "en": "STEP 4 — Audio",
+        "de": "SCHRITT 4 — Audio", "es": "PASO 4 — Audio",
+        "doge": "STEP 4 — such sound",
+    },
+    "grp_audio_a": {
+        "it": "STEP 3 — Audio", "en": "STEP 3 — Audio",
+        "de": "SCHRITT 3 — Audio", "es": "PASO 3 — Audio",
+        "doge": "STEP 3 — such sound",
+    },
+    "lbl_acodec": {
+        "it": "Codec audio:", "en": "Audio codec:", "de": "Audio-Codec:",
+        "es": "Codec de audio:", "doge": "sound encode:",
+    },
+    "lbl_aqual": {
+        "it": "Qualità audio:", "en": "Audio quality:", "de": "Audioqualität:",
+        "es": "Calidad de audio:", "doge": "how good sound?:",
+    },
+    "lbl_samplerate": {
+        "it": "Sample rate:", "en": "Sample rate:", "de": "Abtastrate:",
+        "es": "Frecuencia de muestreo:", "doge": "many sample per sec:",
+    },
+    # ── Step 5 name ────────────────────────────────────────
+    "grp_name_single_v": {
+        "it": "STEP 5 — Nome file output", "en": "STEP 5 — Output file name",
+        "de": "SCHRITT 5 — Ausgabedateiname", "es": "PASO 5 — Nombre del archivo de salida",
+        "doge": "STEP 5 — name the file wow",
+    },
+    "grp_name_folder_v": {
+        "it": "STEP 5 — Prefisso file output", "en": "STEP 5 — Output file prefix",
+        "de": "SCHRITT 5 — Ausgabedatei-Präfix", "es": "PASO 5 — Prefijo del archivo de salida",
+        "doge": "STEP 5 — prefix wow",
+    },
+    "grp_name_single_a": {
+        "it": "STEP 4 — Nome file output", "en": "STEP 4 — Output file name",
+        "de": "SCHRITT 4 — Ausgabedateiname", "es": "PASO 4 — Nombre del archivo de salida",
+        "doge": "STEP 4 — name the file wow",
+    },
+    "grp_name_folder_a": {
+        "it": "STEP 4 — Prefisso file output", "en": "STEP 4 — Output file prefix",
+        "de": "SCHRITT 4 — Ausgabedatei-Präfix", "es": "PASO 4 — Prefijo del archivo de salida",
+        "doge": "STEP 4 — prefix wow",
+    },
+    "lbl_name_single": {
+        "it": "Nome (senza estensione):", "en": "Name (without extension):",
+        "de": "Name (ohne Erweiterung):", "es": "Nombre (sin extensión):",
+        "doge": "what name? (no .ext):",
+    },
+    "lbl_name_folder": {
+        "it": "Prefisso:", "en": "Prefix:", "de": "Präfix:", "es": "Prefijo:",
+        "doge": "such prefix:",
+    },
+    "txt_name_ph_single": {
+        "it": "Lascia vuoto per mantenere il nome originale",
+        "en": "Leave empty to keep the original name",
+        "de": "Leer lassen, um den Originalnamen beizubehalten",
+        "es": "Dejar vacío para mantener el nombre original",
+        "doge": "leave empty, keep original name wow",
+    },
+    "txt_name_ph_folder": {
+        "it": "Lascia vuoto per nessun prefisso",
+        "en": "Leave empty for no prefix",
+        "de": "Leer lassen für kein Präfix",
+        "es": "Dejar vacío para sin prefijo",
+        "doge": "empty = no prefix. much nothing.",
+    },
+    # ── FFmpeg command box ─────────────────────────────────
+    "grp_cmd": {
+        "it": "Comando ffmpeg (aggiornato live)", "en": "FFmpeg command (live preview)",
+        "de": "FFmpeg-Befehl (Live-Vorschau)", "es": "Comando ffmpeg (vista previa en vivo)",
+        "doge": "such command, very live wow",
+    },
+    "btn_manual": {
+        "it": "✏  Abilita modifica manuale", "en": "✏  Enable manual edit",
+        "de": "✏  Manuelle Bearbeitung aktivieren", "es": "✏  Habilitar edición manual",
+        "doge": "✏  type it myself wow",
+    },
+    "btn_manual_active": {
+        "it": "🔒  Torna a modalità automatica", "en": "🔒  Back to automatic mode",
+        "de": "🔒  Zurück zum automatischen Modus", "es": "🔒  Volver al modo automático",
+        "doge": "🔒  no touch. auto now. wow",
+    },
+    "lbl_hint": {
+        "it": "Usa {INPUT} e {OUTPUT} come segnaposto",
+        "en": "Use {INPUT} and {OUTPUT} as placeholders",
+        "de": "Verwende {INPUT} und {OUTPUT} als Platzhalter",
+        "es": "Usa {INPUT} y {OUTPUT} como marcadores de posición",
+        "doge": "put {INPUT} and {OUTPUT} here. much magic.",
+    },
+    # ── Convert button ─────────────────────────────────────
+    "btn_go": {
+        "it": "▶  CONVERTI", "en": "▶  CONVERT", "de": "▶  KONVERTIEREN",
+        "es": "▶  CONVERTIR", "doge": "▶  DO THE THING wow",
+    },
+    "btn_stop": {
+        "it": "■  INTERROMPI", "en": "■  STOP", "de": "■  ABBRECHEN",
+        "es": "■  DETENER", "doge": "■  STOP IT wow",
+    },
+    # ── Terminal ───────────────────────────────────────────
+    "lbl_terminal": {
+        "it": "Log Terminale:", "en": "Terminal Log:", "de": "Terminal-Protokoll:",
+        "es": "Registro de Terminal:", "doge": "such log, very output:",
+    },
+    "chk_verbose": {
+        "it": "Mostra Log Completo", "en": "Show Full Log", "de": "Vollständiges Protokoll anzeigen",
+        "es": "Mostrar registro completo", "doge": "show all the things",
+    },
+    "terminal_ph": {
+        "it": "L'output di ffmpeg apparirà qui…",
+        "en": "FFmpeg output will appear here…",
+        "de": "FFmpeg-Ausgabe erscheint hier…",
+        "es": "La salida de ffmpeg aparecerá aquí…",
+        "doge": "wow output come here. much wait.",
+    },
+    # ── Bottom bar ─────────────────────────────────────────
+    "lic_bar": {
+        "it": "  DISAGIO PRODUCTION CONVERTER  —  Open source, licenza GNU GPL v3  —  github.com/PlayerintheBUG/Disagio-Production-Converter",
+        "en": "  DISAGIO PRODUCTION CONVERTER  —  Open source, GNU GPL v3 license  —  github.com/PlayerintheBUG/Disagio-Production-Converter",
+        "de": "  DISAGIO PRODUCTION CONVERTER  —  Open Source, GNU GPL v3 Lizenz  —  github.com/PlayerintheBUG/Disagio-Production-Converter",
+        "es": "  DISAGIO PRODUCTION CONVERTER  —  Código abierto, licencia GNU GPL v3  —  github.com/PlayerintheBUG/Disagio-Production-Converter",
+        "doge": "  DISAGIO PRODUCTION CONVERTER  —  very open source wow  —  github.com/PlayerintheBUG/Disagio-Production-Converter",
+    },
+    # ── Auto mode ──────────────────────────────────────────
+    "auto_cmd_preview": {
+        "it": "ffmpeg [parametri calcolati automaticamente per ogni file — vedi terminale durante la conversione]",
+        "en": "ffmpeg [parameters calculated automatically for each file — see terminal during conversion]",
+        "de": "ffmpeg [Parameter werden für jede Datei automatisch berechnet — Terminal während der Konvertierung beachten]",
+        "es": "ffmpeg [parámetros calculados automáticamente para cada archivo — ver terminal durante la conversión]",
+        "doge": "ffmpeg [much auto. such calculate. see terminal wow]",
+    },
+    # ── Dialogs ────────────────────────────────────────────
+    "dlg_warn_title": {
+        "it": "Attenzione", "en": "Warning", "de": "Achtung", "es": "Atención",
+        "doge": "wow careful",
+    },
+    "dlg_warn_no_file": {
+        "it": "Seleziona prima un file o una cartella.",
+        "en": "Please select a file or folder first.",
+        "de": "Bitte zuerst eine Datei oder einen Ordner auswählen.",
+        "es": "Por favor selecciona primero un archivo o carpeta.",
+        "doge": "pls pick file first. such empty. wow.",
+    },
+    "dlg_auto_folder_title": {
+        "it": "Modalità AUTO — cartella",
+        "en": "AUTO mode — folder",
+        "de": "AUTO-Modus — Ordner",
+        "es": "Modo AUTO — carpeta",
+        "doge": "AUTO mode — many file wow",
+    },
+    "dlg_auto_folder_body": {
+        "it": "In modalità AUTO ogni file viene analizzato con ffprobe prima della conversione.\nSu cartelle grandi questo può richiedere qualche minuto in più.\n\nProcedere?",
+        "en": "In AUTO mode, each file is analyzed with ffprobe before conversion.\nFor large folders this may take a few extra minutes.\n\nProceed?",
+        "de": "Im AUTO-Modus wird jede Datei vor der Konvertierung mit ffprobe analysiert.\nBei großen Ordnern kann dies einige Minuten länger dauern.\n\nFortfahren?",
+        "es": "En modo AUTO, cada archivo se analiza con ffprobe antes de la conversión.\nEn carpetas grandes esto puede tardar algunos minutos extra.\n\nProceder?",
+        "doge": "AUTO mode: ffprobe sniff every file first. big folder = much wait.\n\ndo it? wow",
+    },
+    "dlg_no_files_title": {
+        "it": "Nessun file", "en": "No files", "de": "Keine Dateien", "es": "Ningún archivo",
+        "doge": "such empty",
+    },
+    "dlg_no_files_body": {
+        "it": "Nessun file da convertire trovato.",
+        "en": "No files to convert were found.",
+        "de": "Keine zu konvertierenden Dateien gefunden.",
+        "es": "No se encontraron archivos para convertir.",
+        "doge": "no file found. much sadness. wow.",
+    },
+    "dlg_confirm_title": {
+        "it": "Conferma", "en": "Confirm", "de": "Bestätigen", "es": "Confirmar",
+        "doge": "u sure? wow",
+    },
+    "dlg_done_title": {
+        "it": "Conversione completata", "en": "Conversion completed",
+        "de": "Konvertierung abgeschlossen", "es": "Conversión completada",
+        "doge": "all done! such convert! wow!",
+    },
+    "dlg_done_body_ok": {
+        "it": "✅  File convertiti:", "en": "✅  Files converted:", "de": "✅  Konvertierte Dateien:",
+        "es": "✅  Archivos convertidos:", "doge": "✅  wow files done:",
+    },
+    "dlg_done_body_err": {
+        "it": "⚠️  File convertiti:", "en": "⚠️  Files converted:", "de": "⚠️  Konvertierte Dateien:",
+        "es": "⚠️  Archivos convertidos:", "doge": "⚠️  many done:",
+    },
+    "dlg_done_errors": {
+        "it": "\n   Errori:", "en": "\n   Errors:", "de": "\n   Fehler:", "es": "\n   Errores:",
+        "doge": "\n   oops:",
+    },
+    # ── confirm dialog fields ──────────────────────────────
+    "conf_files": {
+        "it": "File da convertire:", "en": "Files to convert:", "de": "Zu konvertierende Dateien:",
+        "es": "Archivos a convertir:", "doge": "files to wow:",
+    },
+    "conf_img_conv": {
+        "it": "Immagini da convertire:", "en": "Images to convert:", "de": "Zu konvertierende Bilder:",
+        "es": "Imágenes a convertir:", "doge": "pics to change:",
+    },
+    "conf_raw": {
+        "it": "File RAW da copiare in FOTO_RAW:", "en": "RAW files to copy to FOTO_RAW:",
+        "de": "RAW-Dateien in FOTO_RAW kopieren:", "es": "Archivos RAW a copiar en FOTO_RAW:",
+        "doge": "RAW to copy, such safe:",
+    },
+    "conf_fmt": {
+        "it": "Formato output:", "en": "Output format:", "de": "Ausgabeformat:",
+        "es": "Formato de salida:", "doge": "output box:",
+    },
+    "conf_qual": {
+        "it": "Qualità:", "en": "Quality:", "de": "Qualität:", "es": "Calidad:",
+        "doge": "how good?:",
+    },
+    "conf_gpu": {
+        "it": "Encoder GPU:", "en": "GPU Encoder:", "de": "GPU-Encoder:",
+        "es": "Codificador GPU:", "doge": "fast chip:",
+    },
+    "conf_hw": {
+        "it": "HW decoding:", "en": "HW decoding:", "de": "HW-Dekodierung:", "es": "Decodificación HW:",
+        "doge": "hardware fast?:",
+    },
+    "conf_hw_yes": {
+        "it": "Sì", "en": "Yes", "de": "Ja", "es": "Sí", "doge": "wow yes",
+    },
+    "conf_hw_no": {
+        "it": "No", "en": "No", "de": "Nein", "es": "No", "doge": "such no",
+    },
+    "conf_vcodec": {
+        "it": "Codec video:", "en": "Video codec:", "de": "Video-Codec:", "es": "Codec de video:",
+        "doge": "encode magic:",
+    },
+    "conf_container": {
+        "it": "Container:", "en": "Container:", "de": "Container:", "es": "Contenedor:",
+        "doge": "file box:",
+    },
+    "conf_res": {
+        "it": "Risoluzione:", "en": "Resolution:", "de": "Auflösung:", "es": "Resolución:",
+        "doge": "many pixel?:",
+    },
+    "conf_acodec": {
+        "it": "Codec audio:", "en": "Audio codec:", "de": "Audio-Codec:", "es": "Codec de audio:",
+        "doge": "sound code:",
+    },
+    "conf_samplerate": {
+        "it": "Sample rate:", "en": "Sample rate:", "de": "Abtastrate:",
+        "es": "Frecuencia de muestreo:", "doge": "sound samples:",
+    },
+    "conf_prefix": {
+        "it": "Prefisso:", "en": "Prefix:", "de": "Präfix:", "es": "Prefijo:",
+        "doge": "name before name:",
+    },
+    # ── log messages ───────────────────────────────────────
+    "log_interrupted": {
+        "it": "\n⚠  Conversione interrotta dall'utente.",
+        "en": "\n⚠  Conversion interrupted by user.",
+        "de": "\n⚠  Konvertierung vom Benutzer unterbrochen.",
+        "es": "\n⚠  Conversión interrumpida por el usuario.",
+        "doge": "\n⚠  user say STOP. such interrupt. wow.",
+    },
+    "log_completed": {
+        "it": "  COMPLETATO — OK:", "en": "  COMPLETED — OK:", "de": "  ABGESCHLOSSEN — OK:",
+        "es": "  COMPLETADO — OK:", "doge": "  WOW DONE — OK:",
+    },
+    "log_errors": {
+        "it": "   ERRORI:", "en": "   ERRORS:", "de": "   FEHLER:", "es": "   ERRORES:",
+        "doge": "   oops:",
+    },
+    # ── theme editor dialog ────────────────────────────────
+    "dlg_theme_title": {
+        "it": "Editor Tema Personalizzato", "en": "Custom Theme Editor",
+        "de": "Benutzerdefinierter Design-Editor", "es": "Editor de Tema Personalizado",
+        "doge": "wow color editor",
+    },
+    "dlg_theme_name_lbl": {
+        "it": "Nome Tema:", "en": "Theme name:", "de": "Design-Name:", "es": "Nombre del tema:",
+        "doge": "name the color:",
+    },
+    "dlg_theme_name_ph": {
+        "it": "Es. Mio Tema...", "en": "E.g. My Theme...", "de": "Z.B. Mein Design...",
+        "es": "Ej. Mi Tema...", "doge": "E.g. such theme...",
+    },
+    "dlg_theme_info": {
+        "it": "Clicca sui colori per modificarli:", "en": "Click colors to edit them:",
+        "de": "Klicke auf Farben zum Bearbeiten:", "es": "Haz clic en los colores para editarlos:",
+        "doge": "click color to wow change:",
+    },
+    "dlg_theme_save": {
+        "it": "Salva Tema", "en": "Save Theme", "de": "Design speichern", "es": "Guardar Tema",
+        "doge": "keep colors wow",
+    },
+    "dlg_theme_cancel": {
+        "it": "Annulla", "en": "Cancel", "de": "Abbrechen", "es": "Cancelar",
+        "doge": "nope",
+    },
+    "dlg_theme_delete": {
+        "it": "Elimina Tema", "en": "Delete Theme", "de": "Design löschen", "es": "Eliminar Tema",
+        "doge": "bye color",
+    },
+    "dlg_theme_default_name": {
+        "it": "Tema Custom", "en": "Custom Theme", "de": "Benutzerdefiniertes Design",
+        "es": "Tema Personalizado", "doge": "wow custom",
+    },
+    "dlg_color_pick": {
+        "it": "Scegli Colore", "en": "Pick Color", "de": "Farbe wählen", "es": "Elegir Color",
+        "doge": "pick wow color",
+    },
+    # ── license dialog ─────────────────────────────────────
+    "dlg_lic_title": {
+        "it": "Licenza — GNU GPL v3", "en": "License — GNU GPL v3",
+        "de": "Lizenz — GNU GPL v3", "es": "Licencia — GNU GPL v3",
+        "doge": "legal stuff — GNU GPL v3 wow",
+    },
+    # ── ffmpeg not found ───────────────────────────────────
+    "ffmpeg_not_found_title": {
+        "it": "FFmpeg non trovato", "en": "FFmpeg not found",
+        "de": "FFmpeg nicht gefunden", "es": "FFmpeg no encontrado",
+        "doge": "where ffmpeg? such missing wow",
+    },
+    "ffmpeg_not_found_body": {
+        "it": "Impossibile trovare ffmpeg.\n\nCercato in:\n  • Bundle exe (PyInstaller)\n  • Cartella dell'eseguibile\n  • PATH di sistema\n\nSu Linux installa con:  sudo dnf install ffmpeg\nSu Windows scarica da:  https://ffmpeg.org/download.html\ne metti ffmpeg.exe nella stessa cartella di questo programma.",
+        "en": "Cannot find ffmpeg.\n\nSearched in:\n  • PyInstaller bundle\n  • Executable folder\n  • System PATH\n\nOn Linux install with:  sudo dnf install ffmpeg\nOn Windows download from:  https://ffmpeg.org/download.html\nand put ffmpeg.exe in the same folder as this program.",
+        "de": "FFmpeg konnte nicht gefunden werden.\n\nGesucht in:\n  • PyInstaller-Bundle\n  • Ausführbarer Ordner\n  • System-PATH\n\nUnter Linux installieren mit:  sudo dnf install ffmpeg\nUnter Windows herunterladen von:  https://ffmpeg.org/download.html\nund ffmpeg.exe in denselben Ordner wie dieses Programm legen.",
+        "es": "No se puede encontrar ffmpeg.\n\nBuscado en:\n  • Bundle PyInstaller\n  • Carpeta del ejecutable\n  • PATH del sistema\n\nEn Linux instalar con:  sudo dnf install ffmpeg\nEn Windows descargar de:  https://ffmpeg.org/download.html\ny poner ffmpeg.exe en la misma carpeta que este programa.",
+        "doge": "ffmpeg not here. much missing wow.\n\nlooked in:\n  • exe bundle\n  • exe folder\n  • system PATH\n\nLinux: sudo dnf install ffmpeg\nWindows: get from https://ffmpeg.org/download.html\nput ffmpeg.exe next to this program. pls.",
+    },
+    # ── sample rates / resolutions (translated labels) ─────
+    "keep_original": {
+        "it": "Mantieni originale", "en": "Keep original", "de": "Original beibehalten",
+        "es": "Mantener original", "doge": "keep as is wow",
+    },
+}
+
+# Active language code
+_LANG = "it"
+
+def T(key: str) -> str:
+    """Return translated string for the current language."""
+    entry = TRANSLATIONS.get(key)
+    if entry is None:
+        return key
+    return entry.get(_LANG, entry.get("it", key))
+
+def set_language(lang_code: str):
+    global _LANG
+    _LANG = lang_code
+
+
+# ── Localised display for RESOLUTIONS and SAMPLE_RATES ───────────────────────
+_RES_DISPLAY = {
+    # internal_key: { lang: display_text }
+    "Mantieni originale": {
+        "it": "Mantieni originale",
+        "en": "Keep original",
+        "de": "Original beibehalten",
+        "es": "Mantener original",
+        "doge": "keep as is wow",
+    },
+    "480p  (854×480)":    {"it": "480p  (854×480)",    "en": "480p  (854×480)",    "de": "480p  (854×480)",    "es": "480p  (854×480)",    "doge": "480p  (854×480)"},
+    "720p  (1280×720)":   {"it": "720p  (1280×720)",   "en": "720p  (1280×720)",   "de": "720p  (1280×720)",   "es": "720p  (1280×720)",   "doge": "720p  (1280×720)"},
+    "1080p (1920×1080)":  {"it": "1080p (1920×1080)",  "en": "1080p (1920×1080)",  "de": "1080p (1920×1080)",  "es": "1080p (1920×1080)",  "doge": "1080p (1920×1080)"},
+    "1440p QHD (2560×1440)": {"it": "1440p QHD (2560×1440)", "en": "1440p QHD (2560×1440)", "de": "1440p QHD (2560×1440)", "es": "1440p QHD (2560×1440)", "doge": "1440p QHD (2560×1440)"},
+    "4K UHD (3840×2160)": {"it": "4K UHD (3840×2160)", "en": "4K UHD (3840×2160)", "de": "4K UHD (3840×2160)", "es": "4K UHD (3840×2160)", "doge": "4K UHD (3840×2160)"},
+    "8K UHD (7680×4320)": {"it": "8K UHD (7680×4320)", "en": "8K UHD (7680×4320)", "de": "8K UHD (7680×4320)", "es": "8K UHD (7680×4320)", "doge": "8K UHD (7680×4320)"},
+}
+
+_SR_DISPLAY = {
+    "Mantieni originale": {
+        "it": "Mantieni originale",
+        "en": "Keep original",
+        "de": "Original beibehalten",
+        "es": "Mantener original",
+        "doge": "keep as is wow",
+    },
+    "44100 Hz": {"it": "44100 Hz", "en": "44100 Hz", "de": "44100 Hz", "es": "44100 Hz", "doge": "44100 Hz"},
+    "48000 Hz": {"it": "48000 Hz", "en": "48000 Hz", "de": "48000 Hz", "es": "48000 Hz", "doge": "48000 Hz"},
+    "96000 Hz": {"it": "96000 Hz", "en": "96000 Hz", "de": "96000 Hz", "es": "96000 Hz", "doge": "96000 Hz"},
+    "192000 Hz": {"it": "192000 Hz", "en": "192000 Hz", "de": "192000 Hz", "es": "192000 Hz", "doge": "192000 Hz"},
+}
+
+def res_display_items():
+    """Return localised resolution labels in insertion order."""
+    return [d.get(_LANG, d["it"]) for d in _RES_DISPLAY.values()]
+
+def res_internal_key(display_text: str) -> str:
+    """Map a localised display label back to the internal RESOLUTIONS key."""
+    for internal, d in _RES_DISPLAY.items():
+        if display_text in d.values():
+            return internal
+    return display_text  # fallback: already internal
+
+def sr_display_items():
+    """Return localised sample-rate labels."""
+    return [d.get(_LANG, d["it"]) for d in _SR_DISPLAY.items()]
+
+def sr_display_items():
+    """Return localised sample-rate labels."""
+    return [d.get(_LANG, d["it"]) for d in _SR_DISPLAY.values()]
+
+def sr_internal_key(display_text: str) -> str:
+    """Map a localised sample-rate label back to the internal key."""
+    for internal, d in _SR_DISPLAY.items():
+        if display_text in d.values():
+            return internal
+    return display_text
+
+def sr_display_for(internal: str) -> str:
+    """Return the localised label for a given internal sample-rate key."""
+    d = _SR_DISPLAY.get(internal)
+    if d:
+        return d.get(_LANG, d["it"])
+    return internal
+
+def res_display_for(internal: str) -> str:
+    """Return the localised label for a given internal resolution key."""
+    d = _RES_DISPLAY.get(internal)
+    if d:
+        return d.get(_LANG, d["it"])
+    return internal
+
 # ============================================================
 #  CONFIGURAZIONE E TEMI
 # ============================================================
@@ -584,9 +1237,12 @@ def load_config():
             if "custom_themes" in cfg:
                 for k, v in cfg["custom_themes"].items():
                     THEMES[k] = v
+            # restore saved language
+            if "language" in cfg:
+                set_language(cfg["language"])
             return cfg
     except Exception:
-        return {"theme": "Dark Classic", "verbose_log": False}
+        return {"theme": "Dark Classic", "verbose_log": False, "language": "it"}
 def save_config(cfg):
     try:
         with open(CONFIG_FILE, "w") as f:
@@ -698,7 +1354,7 @@ def get_stylesheet(theme_name):
 class ThemeEditorDialog(QDialog):
     def __init__(self, current_theme_name, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Editor Tema Personalizzato")
+        self.setWindowTitle(T("dlg_theme_title"))
         self.resize(500, 600)
         # Load existing colors for the selected theme (or defaults)
         self.colors = dict(THEMES.get(current_theme_name, THEMES["Dark Classic"]))
@@ -745,15 +1401,15 @@ class ThemeEditorDialog(QDialog):
 
         # Nome Tema
         name_lay = QHBoxLayout()
-        name_lay.addWidget(QLabel("Nome Tema:"))
+        name_lay.addWidget(QLabel(T("dlg_theme_name_lbl")))
         self.txt_name = QLineEdit()
-        self.txt_name.setPlaceholderText("Es. Mio Tema...")
+        self.txt_name.setPlaceholderText(T("dlg_theme_name_ph"))
         if current_theme_name not in DEFAULT_THEMES:
             self.txt_name.setText(current_theme_name)
         name_lay.addWidget(self.txt_name)
         lay.addLayout(name_lay)
 
-        lbl_info = QLabel("Clicca sui colori per modificarli:")
+        lbl_info = QLabel(T("dlg_theme_info"))
         lbl_info.setStyleSheet("background: transparent; margin-top:10px;")
         lay.addWidget(lbl_info)
 
@@ -785,13 +1441,13 @@ class ThemeEditorDialog(QDialog):
 
         # Bottoni Azione
         btn_lay = QHBoxLayout()
-        btn_save = QPushButton("Salva Tema")
+        btn_save = QPushButton(T("dlg_theme_save"))
         btn_save.setObjectName("btn_primary")
         btn_save.clicked.connect(self.accept)
-        btn_cancel = QPushButton("Annulla")
+        btn_cancel = QPushButton(T("dlg_theme_cancel"))
         btn_cancel.clicked.connect(self.reject)
 
-        btn_delete = QPushButton("Elimina Tema")
+        btn_delete = QPushButton(T("dlg_theme_delete"))
         btn_delete.setObjectName("btn_danger")
         btn_delete.clicked.connect(self._delete_theme)
         if current_theme_name in DEFAULT_THEMES:
@@ -807,7 +1463,7 @@ class ThemeEditorDialog(QDialog):
 
     def _pick_color(self, key, btn):
         from PyQt6.QtGui import QColor
-        color = QColorDialog.getColor(QColor(self.colors[key]), self, "Scegli Colore")
+        color = QColorDialog.getColor(QColor(self.colors[key]), self, T("dlg_color_pick"))
         if color.isValid():
             hex_c = color.name()
             self.colors[key] = hex_c
@@ -822,7 +1478,7 @@ class ThemeEditorDialog(QDialog):
 class LicenseDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Licenza — GNU GPL v3")
+        self.setWindowTitle(T("dlg_lic_title"))
         self.resize(620, 480)
         lay = QVBoxLayout(self)
         txt = QTextEdit()
@@ -889,7 +1545,8 @@ class ConvertThread(QThread):
         sample  = self.params["sample_rate"]
         hwaccel = self.params.get("hwaccel", True)
         res_key = self.params.get("resolution", "Mantieni originale")
-        sr_flag = [] if sample == "Mantieni originale" else ["-ar", sample.replace(" Hz", "")]
+        sample_internal = sr_internal_key(sample)
+        sr_flag = [] if sample_internal == "Mantieni originale" else ["-ar", sample_internal.replace(" Hz", "")]
         hw_flag = ["-hwaccel", "auto"] if hwaccel else []
         audio_opts = self.params["audio_preset"].split()
         cmd = [FFMPEG_BIN] + hw_flag + ["-i", src]
@@ -1030,27 +1687,38 @@ class MainWindow(QMainWindow):
         title.setStyleSheet("color:#8080ff; letter-spacing:2px; background: transparent;")
         title_row.addWidget(title)
         title_row.addStretch()
-        title_row.addWidget(QLabel("Tema:"))
+        self.cmb_lang = QComboBox()
+        self.cmb_lang.addItems(list(LANGUAGES.keys()))
+        # set current language from config
+        _cfg_lang = load_config().get("language", "it")
+        for display_name, code in LANGUAGES.items():
+            if code == _cfg_lang:
+                self.cmb_lang.setCurrentText(display_name)
+                break
+        self.cmb_lang.currentTextChanged.connect(self._change_language)
+        title_row.addWidget(self.cmb_lang)
+        title_row.addSpacing(10)
+        title_row.addWidget(QLabel(T("lbl_theme")))
         self.cmb_theme = QComboBox()
         self.cmb_theme.addItems(list(THEMES.keys()))
         cfg = load_config()
         self.cmb_theme.setCurrentText(cfg.get("theme", "Dark Classic"))
         self.cmb_theme.currentTextChanged.connect(self._change_theme)
         title_row.addWidget(self.cmb_theme)
-        btn_edit_theme = QPushButton(" Modifica Tema ")
+        btn_edit_theme = QPushButton(T("btn_edit_theme"))
         # Use a generic icon to indicate theme editing (standard "preferences" icon)
         try:
             from PyQt6.QtGui import QIcon
             btn_edit_theme.setIcon(QIcon.fromTheme("preferences-desktop-theme"))
         except Exception:
             pass
-        btn_edit_theme.setToolTip("Modifica o crea un tema personalizzato")
+        btn_edit_theme.setToolTip(T("btn_edit_theme_tip"))
         btn_edit_theme.clicked.connect(self._edit_theme)
         title_row.addWidget(btn_edit_theme)
         title_row.addSpacing(10)
-        btn_lic = QPushButton("⚖  GPL v3")
+        btn_lic = QPushButton(T("btn_license"))
         btn_lic.setObjectName("btn_license")
-        btn_lic.setToolTip("Visualizza la licenza GNU GPL v3")
+        btn_lic.setToolTip(T("btn_license_tip"))
         btn_lic.clicked.connect(self._show_license)
         title_row.addWidget(btn_lic)
         root.addLayout(title_row)
@@ -1066,11 +1734,11 @@ class MainWindow(QMainWindow):
         scroll.setWidget(opts_w)
         root.addWidget(scroll, stretch=3)
         # ── STEP 1 ────────────────────────────────────────────
-        self._section("STEP 1 — Sorgente")
+        self._section(T("step1_title"))
         row1 = QHBoxLayout()
         self.bg_mode = QButtonGroup(self)
-        self.rb_single = QRadioButton("File singolo")
-        self.rb_folder = QRadioButton("Cartella intera")
+        self.rb_single = QRadioButton(T("rb_single"))
+        self.rb_folder = QRadioButton(T("rb_folder"))
         self.rb_single.setChecked(True)
         self.bg_mode.addButton(self.rb_single, 0)
         self.bg_mode.addButton(self.rb_folder, 1)
@@ -1079,22 +1747,22 @@ class MainWindow(QMainWindow):
         row1.addStretch()
         self.opts_layout.addLayout(row1)
         frow = QHBoxLayout()
-        self.lbl_file = QLabel("Nessun file selezionato")
+        self.lbl_file = QLabel(T("lbl_no_file"))
         self.lbl_file.setObjectName("file_label")
         self.lbl_file.setWordWrap(True)
-        self.btn_browse = QPushButton("Sfoglia…")
+        self.btn_browse = QPushButton(T("btn_browse"))
         self.btn_browse.clicked.connect(self._browse)
         frow.addWidget(self.lbl_file, stretch=1)
         frow.addWidget(self.btn_browse)
         self.opts_layout.addLayout(frow)
         self._sep()
         # ── STEP 2 ────────────────────────────────────────────
-        self._section("STEP 2 — Tipo output")
+        self._section(T("step2_title"))
         row2 = QHBoxLayout()
         self.bg_type = QButtonGroup(self)
-        self.rb_video = QRadioButton("Video + Audio")
-        self.rb_audio = QRadioButton("Solo Audio")
-        self.rb_image = QRadioButton("Immagini")
+        self.rb_video = QRadioButton(T("rb_video"))
+        self.rb_audio = QRadioButton(T("rb_audio"))
+        self.rb_image = QRadioButton(T("rb_image"))
         self.rb_video.setChecked(True)
         self.bg_type.addButton(self.rb_video, 0)
         self.bg_type.addButton(self.rb_audio, 1)
@@ -1107,11 +1775,11 @@ class MainWindow(QMainWindow):
         self.opts_layout.addLayout(row2)
         self._sep()
         # ── STEP 3: video ─────────────────────────────────────
-        self.grp_video = QGroupBox("STEP 3 — Video")
+        self.grp_video = QGroupBox(T("grp_video"))
         vlay = QVBoxLayout(self.grp_video)
         # GPU
         gpu_row = QHBoxLayout()
-        gpu_row.addWidget(QLabel("Encoder GPU:"))
+        gpu_row.addWidget(QLabel(T("lbl_gpu")))
         self.bg_gpu = QButtonGroup(self)
         for i, g in enumerate(GPU_OPTIONS):
             rb = QRadioButton(g)
@@ -1123,37 +1791,36 @@ class MainWindow(QMainWindow):
         vlay.addLayout(gpu_row)
         # hwaccel
         hw_row = QHBoxLayout()
-        self.chk_hwaccel = QCheckBox("Accelerazione hardware decodifica  (-hwaccel auto)")
+        self.chk_hwaccel = QCheckBox(T("chk_hwaccel"))
         self.chk_hwaccel.setChecked(True)
         self.chk_hwaccel.toggled.connect(self._update_cmd_preview)
         hw_row.addWidget(self.chk_hwaccel); hw_row.addStretch()
         vlay.addLayout(hw_row)
         # container + codec
         cc_row = QHBoxLayout()
-        cc_row.addWidget(QLabel("Container:"))
+        cc_row.addWidget(QLabel(T("lbl_container")))
         self.cmb_container = QComboBox()
         self.cmb_container.addItems(CONTAINER_CODECS.keys())
         self.cmb_container.currentTextChanged.connect(self._on_container_changed)
         cc_row.addWidget(self.cmb_container)
         cc_row.addSpacing(20)
-        cc_row.addWidget(QLabel("Codec video:"))
+        cc_row.addWidget(QLabel(T("lbl_vcodec")))
         self.cmb_vcodec = QComboBox()
         self.cmb_vcodec.currentTextChanged.connect(self._update_cmd_preview)
         cc_row.addWidget(self.cmb_vcodec); cc_row.addStretch()
         vlay.addLayout(cc_row)
         # qualità + AUTO
         vq_row = QHBoxLayout()
-        vq_row.addWidget(QLabel("Qualità video:"))
+        vq_row.addWidget(QLabel(T("lbl_vqual")))
         self.bg_vqual = QButtonGroup(self)
-        for i, q in enumerate(["Alto", "Medio", "Basso", "AUTO"]):
+        _qual_keys = ["qual_high", "qual_mid", "qual_low", "qual_auto"]
+        for i, q in enumerate([T("qual_high"), T("qual_mid"), T("qual_low"), T("qual_auto")]):
             rb = QRadioButton(q)
-            if q == "Medio": rb.setChecked(True)
+            if i == 1: rb.setChecked(True)
             self.bg_vqual.addButton(rb, i)
             rb.toggled.connect(self._on_vqual_changed)
             vq_row.addWidget(rb)
-        self.lbl_auto_warn = QLabel(
-            "⚠ Il sistema AUTO è una stima — può commettere errori su sorgenti atipici"
-        )
+        self.lbl_auto_warn = QLabel(T("lbl_auto_warn"))
         self.lbl_auto_warn.setObjectName("auto_warn")
         self.lbl_auto_warn.setVisible(False)
         vq_row.addWidget(self.lbl_auto_warn)
@@ -1161,23 +1828,21 @@ class MainWindow(QMainWindow):
         vlay.addLayout(vq_row)
         # risoluzione output
         res_row = QHBoxLayout()
-        res_row.addWidget(QLabel("Risoluzione output:"))
+        res_row.addWidget(QLabel(T("lbl_resolution")))
         self.cmb_res = QComboBox()
-        self.cmb_res.addItems(RESOLUTIONS.keys())
-        self.cmb_res.setCurrentText("Mantieni originale")
+        self.cmb_res.addItems(res_display_items())
+        self.cmb_res.setCurrentText(res_display_for("Mantieni originale"))
         self.cmb_res.currentTextChanged.connect(self._update_cmd_preview)
         res_row.addWidget(self.cmb_res)
-        res_row.addWidget(QLabel(
-            "<small style='color:#666688'>  Aspect ratio originale preservato  |  filtro: lanczos</small>"
-        ))
+        res_row.addWidget(QLabel(T("lbl_res_note")))
         res_row.addStretch()
         vlay.addLayout(res_row)
         self.opts_layout.addWidget(self.grp_video)
         # ── STEP 3 (immagini): immagini ───────────────────────
-        self.grp_image = QGroupBox("STEP 3 — Immagini")
+        self.grp_image = QGroupBox(T("grp_image"))
         ilay = QVBoxLayout(self.grp_image)
         ifmt_row = QHBoxLayout()
-        ifmt_row.addWidget(QLabel("Formato di output:"))
+        ifmt_row.addWidget(QLabel(T("lbl_imgfmt")))
         self.cmb_imgfmt = QComboBox()
         self.cmb_imgfmt.addItems(IMAGE_OUTPUT_FORMATS.keys())
         self.cmb_imgfmt.currentTextChanged.connect(self._on_imgfmt_changed)
@@ -1186,12 +1851,12 @@ class MainWindow(QMainWindow):
         # Slider qualità
         ilay.addSpacing(4)
         slider_header = QHBoxLayout()
-        slider_header.addWidget(QLabel("Qualità / Compressione:"))
+        slider_header.addWidget(QLabel(T("lbl_imgqual_header")))
         slider_header.addStretch()
         ilay.addLayout(slider_header)
         # Etichette sinistra/destra con slider al centro
         slider_row = QHBoxLayout()
-        lbl_low = QLabel("Bassa qualità\n(File piccolo)")
+        lbl_low = QLabel(T("lbl_img_low").replace("\\n","\n"))
         lbl_low.setStyleSheet("color:#cc7700; font-size:11px; text-align:right;")
         lbl_low.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         lbl_low.setFixedWidth(110)
@@ -1203,7 +1868,7 @@ class MainWindow(QMainWindow):
         self.sld_imgqual.setTickInterval(10)
         self.sld_imgqual.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.sld_imgqual.valueChanged.connect(self._on_imgqual_changed)
-        lbl_high = QLabel("Alta qualità\n(File grande)")
+        lbl_high = QLabel(T("lbl_img_high").replace("\\n","\n"))
         lbl_high.setStyleSheet("color:#44cc88; font-size:11px;")
         lbl_high.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         lbl_high.setFixedWidth(110)
@@ -1219,17 +1884,12 @@ class MainWindow(QMainWindow):
         )
         ilay.addWidget(self.lbl_imgqual_val)
         # Avviso BMP (nessuna compressione)
-        self.lbl_bmp_warn = QLabel(
-            "ℹ  Il formato BMP non supporta la compressione — lo slider non ha effetto."
-        )
+        self.lbl_bmp_warn = QLabel(T("lbl_bmp_warn"))
         self.lbl_bmp_warn.setStyleSheet("color:#888888; font-size:11px; font-style:italic;")
         self.lbl_bmp_warn.setVisible(False)
         ilay.addWidget(self.lbl_bmp_warn)
         # Nota RAW (mostrata solo in modalità cartella)
-        self.lbl_raw_note = QLabel(
-            "📁  I file RAW trovati nella cartella verranno copiati intatti in una "
-            "sottocartella separata  \"FOTO_RAW\"  accanto ai file convertiti."
-        )
+        self.lbl_raw_note = QLabel(T("lbl_raw_note"))
         self.lbl_raw_note.setWordWrap(True)
         self.lbl_raw_note.setStyleSheet(
             "color:#aaaaff; font-size:11px; font-style:italic; padding:4px 0;"
@@ -1240,43 +1900,43 @@ class MainWindow(QMainWindow):
         self.grp_audio = QGroupBox("STEP 4 — Audio")
         alay = QVBoxLayout(self.grp_audio)
         ac_row = QHBoxLayout()
-        ac_row.addWidget(QLabel("Codec audio:"))
+        ac_row.addWidget(QLabel(T("lbl_acodec")))
         self.cmb_acodec = QComboBox()
         self.cmb_acodec.addItems(AUDIO_CODECS)
         self.cmb_acodec.currentTextChanged.connect(self._update_cmd_preview)
         ac_row.addWidget(self.cmb_acodec); ac_row.addStretch()
         alay.addLayout(ac_row)
         aq_row = QHBoxLayout()
-        aq_row.addWidget(QLabel("Qualità audio:"))
+        aq_row.addWidget(QLabel(T("lbl_aqual")))
         self.bg_aqual = QButtonGroup(self)
-        for i, q in enumerate(["Alto", "Medio", "Basso"]):
+        for i, q in enumerate([T("qual_high"), T("qual_mid"), T("qual_low")]):
             rb = QRadioButton(q)
-            if q == "Medio": rb.setChecked(True)
+            if i == 1: rb.setChecked(True)
             self.bg_aqual.addButton(rb, i)
             rb.toggled.connect(self._update_cmd_preview)
             aq_row.addWidget(rb)
         aq_row.addStretch()
         alay.addLayout(aq_row)
         sr_row = QHBoxLayout()
-        sr_row.addWidget(QLabel("Sample rate:"))
+        sr_row.addWidget(QLabel(T("lbl_samplerate")))
         self.cmb_sample = QComboBox()
-        self.cmb_sample.addItems(SAMPLE_RATES)
-        self.cmb_sample.setCurrentText("48000 Hz")
+        self.cmb_sample.addItems(sr_display_items())
+        self.cmb_sample.setCurrentText(sr_display_for("48000 Hz"))
         self.cmb_sample.currentTextChanged.connect(self._update_cmd_preview)
         sr_row.addWidget(self.cmb_sample); sr_row.addStretch()
         alay.addLayout(sr_row)
         self.opts_layout.addWidget(self.grp_audio)
         # ── STEP 5: nome / prefisso ───────────────────────────
-        self.grp_name = QGroupBox("STEP 5 — Nome file output")
+        self.grp_name = QGroupBox(T("grp_name_single_v"))
         nlay = QHBoxLayout(self.grp_name)
-        self.lbl_name = QLabel("Nome (senza estensione):")
+        self.lbl_name = QLabel(T("lbl_name_single"))
         nlay.addWidget(self.lbl_name)
         self.txt_name = QLineEdit()
-        self.txt_name.setPlaceholderText("Lascia vuoto per mantenere il nome originale")
+        self.txt_name.setPlaceholderText(T("txt_name_ph_single"))
         nlay.addWidget(self.txt_name)
         self.opts_layout.addWidget(self.grp_name)
         # ── comando ffmpeg ─────────────────────────────────────
-        self.grp_cmd = QGroupBox("Comando ffmpeg (aggiornato live)")
+        self.grp_cmd = QGroupBox(T("grp_cmd"))
         clay = QVBoxLayout(self.grp_cmd)
         self.txt_cmd = QLineEdit()
         self.txt_cmd.setReadOnly(True)
@@ -1286,10 +1946,10 @@ class MainWindow(QMainWindow):
             "border-radius:6px; padding:6px 10px;")
         clay.addWidget(self.txt_cmd)
         cbr = QHBoxLayout()
-        self.btn_manual = QPushButton("✏  Abilita modifica manuale")
+        self.btn_manual = QPushButton(T("btn_manual"))
         self.btn_manual.setCheckable(True)
         self.btn_manual.clicked.connect(self._toggle_manual)
-        self.lbl_hint = QLabel("Usa {INPUT} e {OUTPUT} come segnaposto")
+        self.lbl_hint = QLabel(T("lbl_hint"))
         self.lbl_hint.setStyleSheet("color:#666688; font-size:11px;")
         self.lbl_hint.setVisible(False)
         cbr.addWidget(self.btn_manual)
@@ -1302,7 +1962,7 @@ class MainWindow(QMainWindow):
         self._on_type_changed()
         self._on_imgfmt_changed(self.cmb_imgfmt.currentText())
         # ── CONVERTI ──────────────────────────────────────────
-        self.btn_go = QPushButton("▶  CONVERTI")
+        self.btn_go = QPushButton(T("btn_go"))
         self.btn_go.setObjectName("btn_primary")
         self.btn_go.setMinimumHeight(42)
         self.btn_go.setFont(QFont("monospace", 12, QFont.Weight.Bold))
@@ -1315,12 +1975,12 @@ class MainWindow(QMainWindow):
         root.addWidget(self.progress_bar)
         # Intestazione Terminale
         term_lay = QHBoxLayout()
-        lbl_term = QLabel("Log Terminale:")
+        lbl_term = QLabel(T("lbl_terminal"))
         lbl_term.setStyleSheet("color:#8080ff; font-size:11px; font-weight:bold; background: transparent;")
         term_lay.addWidget(lbl_term)
         term_lay.addStretch()
 
-        self.chk_verbose = QCheckBox("Mostra Log Completo")
+        self.chk_verbose = QCheckBox(T("chk_verbose"))
         cfg = load_config()
         self.chk_verbose.setChecked(cfg.get("verbose_log", False))
         self.chk_verbose.stateChanged.connect(self._save_verbose)
@@ -1329,18 +1989,15 @@ class MainWindow(QMainWindow):
         self.terminal = QPlainTextEdit()
         self.terminal.setReadOnly(True)
         self.terminal.setMinimumHeight(160)
-        self.terminal.setPlaceholderText("L'output di ffmpeg apparirà qui…")
+        self.terminal.setPlaceholderText(T("terminal_ph"))
         root.addWidget(self.terminal, stretch=2)
-        self.btn_stop = QPushButton("■  INTERROMPI")
+        self.btn_stop = QPushButton(T("btn_stop"))
         self.btn_stop.setObjectName("btn_danger")
         self.btn_stop.setVisible(False)
         self.btn_stop.clicked.connect(self._stop)
         root.addWidget(self.btn_stop)
         # ── barra licenza in fondo ────────────────────────────
-        lic_bar = QLabel(
-            "  DISAGIO PRODUCTION CONVERTER  —  Open source, licenza GNU GPL v3  "
-            "—  github.com/playerinthebug/disagio-converter"
-        )
+        lic_bar = QLabel(T("lic_bar"))
         lic_bar.setObjectName("license_bar")
         lic_bar.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(lic_bar)
@@ -1354,6 +2011,23 @@ class MainWindow(QMainWindow):
         self.opts_layout.addWidget(f)
     def _show_license(self):
         LicenseDialog(self).exec()
+    def _change_language(self, display_name):
+        code = LANGUAGES.get(display_name, "it")
+        set_language(code)
+        cfg = load_config()
+        cfg["language"] = code
+        save_config(cfg)
+        # Rebuild the UI with the new language
+        # We recreate the central widget
+        old_central = self.centralWidget()
+        self._build_ui()
+        if old_central:
+            old_central.deleteLater()
+        # Re-apply stylesheet
+        app = QApplication.instance()
+        if app:
+            app.setStyleSheet(get_stylesheet(cfg.get("theme", "Dark Classic")))
+
     def _change_theme(self, theme_name):
         app = QApplication.instance()
         if app:
@@ -1361,6 +2035,7 @@ class MainWindow(QMainWindow):
         cfg = load_config()
         cfg["theme"] = theme_name
         cfg["verbose_log"] = getattr(self, 'chk_verbose', QCheckBox()).isChecked()
+        cfg["language"] = _LANG
         save_config(cfg)
     def _save_verbose(self):
         cfg = load_config()
@@ -1386,7 +2061,7 @@ class MainWindow(QMainWindow):
             else:
                 name = dlg.txt_name.text().strip()
                 if not name:
-                    name = "Tema Custom"
+                    name = T("dlg_theme_default_name")
 
                 # Rimuovi vecchio nome custom se rinominato
                 if curr != name and curr not in DEFAULT_THEMES and curr in cfg["custom_themes"]:
@@ -1422,17 +2097,18 @@ class MainWindow(QMainWindow):
         is_video  = hasattr(self, "rb_video") and self.rb_video.isChecked()
         # Numero step del nome dipende dal tipo di output
         if is_video:
-            name_step = "STEP 5"
+            name_step = "5"
         else:  # audio o immagine: un pannello in meno
-            name_step = "STEP 4"
+            name_step = "4"
+        _sk = "v" if is_video else "a"
         if is_single:
-            self.grp_name.setTitle(f"{name_step} \u2014 Nome file output")
-            self.lbl_name.setText("Nome (senza estensione):")
-            self.txt_name.setPlaceholderText("Lascia vuoto per mantenere il nome originale")
+            self.grp_name.setTitle(T(f"grp_name_single_{_sk}"))
+            self.lbl_name.setText(T("lbl_name_single"))
+            self.txt_name.setPlaceholderText(T("txt_name_ph_single"))
         else:
-            self.grp_name.setTitle(f"{name_step} \u2014 Prefisso file output")
-            self.lbl_name.setText("Prefisso:")
-            self.txt_name.setPlaceholderText("Lascia vuoto per nessun prefisso")
+            self.grp_name.setTitle(T(f"grp_name_folder_{_sk}"))
+            self.lbl_name.setText(T("lbl_name_folder"))
+            self.txt_name.setPlaceholderText(T("txt_name_ph_folder"))
         # Nota RAW visibile solo se modalit\u00e0 immagine + cartella
         if hasattr(self, "lbl_raw_note"):
             self.lbl_raw_note.setVisible(is_image and not is_single)
@@ -1450,28 +2126,26 @@ class MainWindow(QMainWindow):
             self.lbl_raw_note.setVisible(is_image and is_folder)
         # Numera gli step dinamicamente in base alla modalità
         if is_video:
-            self.grp_audio.setTitle("STEP 4 — Audio")
-            name_step = "STEP 5"
+            self.grp_audio.setTitle(T("grp_audio_v"))
+            _sk = "v"
         elif is_audio:
-            self.grp_audio.setTitle("STEP 3 — Audio")
-            name_step = "STEP 4"
+            self.grp_audio.setTitle(T("grp_audio_a"))
+            _sk = "a"
         else:  # image
-            name_step = "STEP 4"
+            _sk = "a"
         is_single = self.rb_single.isChecked()
         self.grp_name.setTitle(
-            f"{name_step} — Nome file output" if is_single
-            else f"{name_step} — Prefisso file output"
+            T(f"grp_name_single_{_sk}") if is_single
+            else T(f"grp_name_folder_{_sk}")
         )
         self._update_cmd_preview()
     def _on_vqual_changed(self):
         btn = self.bg_vqual.checkedButton()
-        is_auto = btn and btn.text() == "AUTO"
+        is_auto = btn and self.bg_vqual.id(btn) == 3
         self.lbl_auto_warn.setVisible(is_auto)
         # in AUTO il comando preview non può mostrare valori reali
         if is_auto:
-            self.txt_cmd.setText(
-                "ffmpeg [parametri calcolati automaticamente per ogni file — vedi terminale durante la conversione]"
-            )
+            self.txt_cmd.setText(T("auto_cmd_preview"))
         else:
             self._update_cmd_preview()
     def _on_imgfmt_changed(self, fmt_label):
@@ -1504,7 +2178,7 @@ class MainWindow(QMainWindow):
         vcodec = self.cmb_vcodec.currentText()
         vqual  = (self.bg_vqual.checkedButton().text()
                   if self.bg_vqual.checkedButton() else "Medio")
-        if vqual == "AUTO":
+        if self.bg_vqual.id(self.bg_vqual.checkedButton()) == 3:
             return "[AUTO]"
         if vcodec in ("DNxHR", "ProRes"):
             return VIDEO_PRESETS[vcodec][vqual]
@@ -1513,7 +2187,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "btn_manual") and self.btn_manual.isChecked():
             return
         btn = self.bg_vqual.checkedButton() if hasattr(self, "bg_vqual") else None
-        if btn and btn.text() == "AUTO" and not (hasattr(self, "rb_image") and self.rb_image.isChecked()):
+        if btn and self.bg_vqual.id(btn) == 3 and not (hasattr(self, "rb_image") and self.rb_image.isChecked()):
             return  # gestito da _on_vqual_changed
         # ── modalità immagine ──
         if hasattr(self, "rb_image") and self.rb_image.isChecked():
@@ -1530,12 +2204,12 @@ class MainWindow(QMainWindow):
         acodec  = self.cmb_acodec.currentText()
         aqual   = (self.bg_aqual.checkedButton().text()
                    if self.bg_aqual.checkedButton() else "Medio")
-        sample  = self.cmb_sample.currentText()
+        sample  = self.cmb_sample.currentText()  # display text, mapped to internal in ConvertThread
         audio_p = AUDIO_PRESETS.get(acodec, {}).get(aqual, "")
-        if sample != "Mantieni originale":
-            audio_p += f" -ar {sample.replace(' Hz','')}"
+        if sr_internal_key(sample) != "Mantieni originale":
+            audio_p += f" -ar {sr_internal_key(sample).replace(' Hz','')}"
         hw  = "-hwaccel auto " if self.chk_hwaccel.isChecked() else ""
-        res = self.cmb_res.currentText() if hasattr(self, "cmb_res") else "Mantieni originale"
+        res = res_internal_key(self.cmb_res.currentText()) if hasattr(self, "cmb_res") else "Mantieni originale"
         res_str = "" if res == "Mantieni originale" else f" -vf scale=W:H:flags=lanczos"
         if mode == "audio":
             ext = AUDIO_ONLY_EXT.get(acodec, "wav")
@@ -1562,12 +2236,12 @@ class MainWindow(QMainWindow):
         for w in controls:
             w.setEnabled(not checked)
         if checked:
-            self.btn_manual.setText("🔒  Torna a modalità automatica")
+            self.btn_manual.setText(T("btn_manual_active"))
             self.txt_cmd.setStyleSheet(
                 "background:#0d0d1a; color:#ffcc00; border:1px solid #aaaa00;"
                 "border-radius:6px; padding:6px 10px;")
         else:
-            self.btn_manual.setText("✏  Abilita modifica manuale")
+            self.btn_manual.setText(T("btn_manual"))
             self.txt_cmd.setStyleSheet(
                 "background:#0d0d1a; color:#00ff88; border:1px solid #2d2d4e;"
                 "border-radius:6px; padding:6px 10px;")
@@ -1601,14 +2275,14 @@ class MainWindow(QMainWindow):
             mode = "video"
         vcodec  = self.cmb_vcodec.currentText()
         acodec  = self.cmb_acodec.currentText()
-        vqual   = (self.bg_vqual.checkedButton().text()
-                   if self.bg_vqual.checkedButton() else "Medio")
-        aqual   = (self.bg_aqual.checkedButton().text()
-                   if self.bg_aqual.checkedButton() else "Medio")
+        _vqual_map = {0: "Alto", 1: "Medio", 2: "Basso", 3: "AUTO"}
+        _aqual_map = {0: "Alto", 1: "Medio", 2: "Basso"}
+        vqual   = _vqual_map.get(self.bg_vqual.id(self.bg_vqual.checkedButton()), "Medio") if self.bg_vqual.checkedButton() else "Medio"
+        aqual   = _aqual_map.get(self.bg_aqual.id(self.bg_aqual.checkedButton()), "Medio") if self.bg_aqual.checkedButton() else "Medio"
         gpu     = self._get_selected_gpu()
         sample  = self.cmb_sample.currentText()
         hwaccel = self.chk_hwaccel.isChecked()
-        res_key = self.cmb_res.currentText()
+        res_key = res_internal_key(self.cmb_res.currentText())
         ext_map   = {"MKV (.mkv)":"mkv","MP4 (.mp4)":"mp4","MOV (.mov)":"mov"}
         video_ext = ext_map.get(self.cmb_container.currentText(), "mkv")
         audio_ext = AUDIO_ONLY_EXT.get(acodec, "wav")
@@ -1719,22 +2393,21 @@ class MainWindow(QMainWindow):
     # ----------------------------------------------------------
     def _start(self):
         path = self.lbl_file.text()
-        if not path or path == "Nessun file selezionato":
-            QMessageBox.warning(self, "Attenzione", "Seleziona prima un file o una cartella.")
+        if not path or path == T("lbl_no_file"):
+            QMessageBox.warning(self, T("dlg_warn_title"), T("dlg_warn_no_file"))
             return
         params = self._collect_params()
         # se AUTO e cartella: avvisa che il probe richiede tempo
         if params.get("vqual") == "AUTO" and self.rb_folder.isChecked():
             if QMessageBox.question(
-                self, "Modalità AUTO — cartella",
-                "In modalità AUTO ogni file viene analizzato con ffprobe prima della conversione.\n"
-                "Su cartelle grandi questo può richiedere qualche minuto in più.\n\nProcedere?",
+                self, T("dlg_auto_folder_title"),
+                T("dlg_auto_folder_body"),
                 QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
             ) != QMessageBox.StandardButton.Ok:
                 return
         jobs = self._collect_jobs(params)
         if not jobs:
-            QMessageBox.warning(self, "Nessun file", "Nessun file da convertire trovato.")
+            QMessageBox.warning(self, T("dlg_no_files_title"), T("dlg_no_files_body"))
             return
         if self.btn_manual.isChecked():
             params["manual_cmd"] = self.txt_cmd.text().strip()
@@ -1746,32 +2419,32 @@ class MainWindow(QMainWindow):
         lines = []
         if mode == "image":
             if conv_jobs:
-                lines.append(f"Immagini da convertire: {conv_jobs}")
+                lines.append(f"{T('conf_img_conv')} {conv_jobs}")
             if raw_jobs:
-                lines.append(f"File RAW da copiare in FOTO_RAW: {raw_jobs}")
+                lines.append(f"{T('conf_raw')} {raw_jobs}")
             lines += [
-                f"Formato output: .{params['img_fmt'].upper()}",
-                f"Qualità: {image_quality_label(params['img_quality'])}",
+                f"{T('conf_fmt')} .{params['img_fmt'].upper()}",
+                f"{T('conf_qual')} {image_quality_label(params['img_quality'])}",
             ]
         else:
-            lines.append(f"File da convertire: {len(jobs)}")
+            lines.append(f"{T('conf_files')} {len(jobs)}")
             if mode == "video":
                 lines += [
-                    f"Encoder GPU: {params['gpu']}",
-                    f"HW decoding: {'Sì' if params['hwaccel'] else 'No'}",
-                    f"Codec video: {params['vcodec']} — {params['vqual']}",
-                    f"Container: .{params['video_ext']}",
-                    f"Risoluzione: {params['resolution']}",
+                    f"{T('conf_gpu')} {params['gpu']}",
+                    f"{T('conf_hw')} {T('conf_hw_yes') if params['hwaccel'] else T('conf_hw_no')}",
+                    f"{T('conf_vcodec')} {params['vcodec']} — {params['vqual']}",
+                    f"{T('conf_container')} .{params['video_ext']}",
+                    f"{T('conf_res')} {res_display_for(params['resolution'])}",
                 ]
             lines += [
-                f"Codec audio: {params['acodec']} — {params['aqual']}",
-                f"Sample rate: {params['sample_rate']}",
+                f"{T('conf_acodec')} {params['acodec']} — {params['aqual']}",
+                f"{T('conf_samplerate')} {params['sample_rate']}",
             ]
         pfx = self.txt_name.text().strip()
         if pfx and not self.rb_single.isChecked():
-            lines.append(f"Prefisso: {pfx}_")
+            lines.append(f"{T('conf_prefix')} {pfx}_")
         if QMessageBox.question(
-            self, "Conferma", "\n".join(lines),
+            self, T("dlg_confirm_title"), "\n".join(lines),
             QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
         ) != QMessageBox.StandardButton.Ok:
             return
@@ -1790,7 +2463,7 @@ class MainWindow(QMainWindow):
     def _stop(self):
         if self.thread:
             self.thread.stop()
-            self._append_log("\n⚠  Conversione interrotta dall'utente.")
+            self._append_log(T("log_interrupted"))
     def _append_log(self, text):
         self.terminal.appendPlainText(text)
         self.terminal.moveCursor(QTextCursor.MoveOperation.End)
@@ -1801,33 +2474,24 @@ class MainWindow(QMainWindow):
         self.btn_stop.setVisible(False)
         self.progress_bar.setValue(100)
         self._append_log(f"\n{'═'*50}")
-        self._append_log(f"  COMPLETATO — OK: {ok}   ERRORI: {err}")
+        self._append_log(f"{T('log_completed')} {ok}   {T('log_errors').strip()} {err}")
         self._append_log(f"{'═'*50}")
         QMessageBox.information(
-            self, "Conversione completata",
-            f"{'✅' if err == 0 else '⚠️'}  File convertiti: {ok}"
-            + (f"\n   Errori: {err}" if err else "")
+            self, T("dlg_done_title"),
+            f"{T('dlg_done_body_ok') if err == 0 else T('dlg_done_body_err')} {ok}"
+            + (f"{T('dlg_done_errors')} {err}" if err else "")
         )
 # ============================================================
 #  MAIN
 # ============================================================
 def main():
     if not os.path.isfile(FFMPEG_BIN) and not shutil.which(FFMPEG_BIN):
-        QApplication(sys.argv)   # serve per mostrare il dialogo
-        QMessageBox.critical(
-            None, "FFmpeg non trovato",
-            f"Impossibile trovare ffmpeg.\n\n"
-            f"Cercato in:\n"
-            f"  • Bundle exe (PyInstaller)\n"
-            f"  • Cartella dell'eseguibile\n"
-            f"  • PATH di sistema\n\n"
-            f"Su Linux installa con:  sudo dnf install ffmpeg\n"
-            f"Su Windows scarica da:  https://ffmpeg.org/download.html\n"
-            f"e metti ffmpeg.exe nella stessa cartella di questo programma."
-        )
+        app2 = QApplication(sys.argv)   # serve per mostrare il dialogo
+        load_config()  # init language
+        QMessageBox.critical(None, T("ffmpeg_not_found_title"), T("ffmpeg_not_found_body"))
         sys.exit(1)
     app = QApplication(sys.argv)
-    cfg = load_config()
+    cfg = load_config()  # also calls set_language() from saved config
     app.setStyleSheet(get_stylesheet(cfg.get("theme", "Dark Classic")))
     app.setApplicationName("DISAGIO PRODUCTION CONVERTER")
     win = MainWindow()
