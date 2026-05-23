@@ -446,54 +446,45 @@ def probe_video(path: str) -> dict:
     except Exception:
         pass
     return result
-def auto_compute_cq(src_info: dict, codec_dst: str, gpu: str,
-                    dst_width: int, dst_height: int) -> str:
+def _build_video_params(codec_dst: str, gpu: str, cq: int, depth: int,
+                        bitrate_target_kbps: int = 0) -> str:
     """
-    Calcola i parametri video ottimali per il codec di destinazione
-    basandosi sulle proprietà del sorgente.
-    Ritorna la stringa di parametri ffmpeg.
+    Costruisce la stringa parametri ffmpeg dato codec/gpu/cq (o bitrate target).
+    Se bitrate_target_kbps > 0 usa modalità VBR/CBR two-pass-compatible invece di CQ.
     """
-    codec_src = src_info["codec"]
-    bitrate   = src_info["bitrate"]
-    fps       = src_info["fps"]
-    depth     = src_info["depth"]
-    width     = src_info["width"]
-    height    = src_info["height"]
-    profile   = src_info.get("profile", "0")
-    # efficienza codec sorgente
-    efficiency = CODEC_EFFICIENCY.get(codec_src, 1.0)
-    # ProRes: affina in base al profilo
-    if codec_src == "prores":
-        p = str(profile).lower()
-        for k, v in PRORES_PROFILE_EFFICIENCY.items():
-            if k in p or p == k:
-                efficiency = v
-                break
-    # bitrate equivalente H264
-    bitrate_equiv = bitrate * efficiency
-    # bits per pixel per frame (sulla risoluzione di DESTINAZIONE)
-    dst_pixels = dst_width * dst_height
-    bpp = (bitrate_equiv / max(fps, 1)) / max(dst_pixels, 1)
-    # per DNxHR/ProRes non si usa CQ — profilo fisso
-    if codec_dst in ("DNxHR", "ProRes"):
-        return auto_mezzanine_profile(codec_dst, dst_width, dst_height, depth)
-    # determina range risoluzione destinazione per delta
-    if dst_height >= 4320:    res_key = "8K UHD"
-    elif dst_height >= 2160:  res_key = "4K UHD"
-    elif dst_height >= 1440:  res_key = "1440p QHD"
-    elif dst_height >= 1080:  res_key = "1080p"
-    elif dst_height >= 720:   res_key = "720p"
-    else:                     res_key = "480p"
-    cq = (AUTO_BASE_CQ.get(codec_dst, 24)
-          + AUTO_DELTA_RES.get(res_key, 0)
-          + auto_delta_fps(fps)
-          + auto_delta_depth(depth)
-          + auto_delta_bpp(bpp))
-    # clamp: mai sotto 8 (eccessivo) né sopra 51
-    cq = max(8, min(51, cq))
-    # costruisce stringa parametri in base a GPU e codec
+    if bitrate_target_kbps > 0:
+        bv = f"{bitrate_target_kbps}k"
+        if codec_dst == "AV1":
+            pix = "p010le" if depth >= 10 else "yuv420p10le"
+            if gpu == "NVIDIA":
+                return f"-c:v av1_nvenc -rc vbr -b:v {bv} -maxrate {int(bitrate_target_kbps*1.5)}k -pix_fmt {pix}"
+            if gpu == "AMD":
+                return f"-c:v av1_amf -rc cbr -b:v {bv} -pix_fmt yuv420p"
+            if gpu == "Intel":
+                return f"-c:v av1_qsv -b:v {bv} -pix_fmt yuv420p"
+            return f"-c:v libsvtav1 -b:v {bv} -pix_fmt {pix}"
+        if codec_dst == "H.264":
+            pix = "yuv420p"
+            if gpu == "NVIDIA":
+                return f"-c:v h264_nvenc -rc vbr -b:v {bv} -maxrate {int(bitrate_target_kbps*1.5)}k -pix_fmt {pix}"
+            if gpu == "AMD":
+                return f"-c:v h264_amf -rc cbr -b:v {bv} -pix_fmt {pix}"
+            if gpu == "Intel":
+                return f"-c:v h264_qsv -b:v {bv} -pix_fmt {pix}"
+            return f"-c:v libx264 -b:v {bv} -pix_fmt {pix}"
+        if codec_dst == "H.265":
+            pix = "p010le" if depth >= 10 else "yuv420p"
+            if gpu == "NVIDIA":
+                return f"-c:v hevc_nvenc -rc vbr -b:v {bv} -maxrate {int(bitrate_target_kbps*1.5)}k -pix_fmt {pix}"
+            if gpu == "AMD":
+                return f"-c:v hevc_amf -rc cbr -b:v {bv} -pix_fmt {pix}"
+            if gpu == "Intel":
+                return f"-c:v hevc_qsv -b:v {bv} -pix_fmt {pix}"
+            return f"-c:v libx265 -b:v {bv} -pix_fmt {pix}"
+        return ""
+    # modalità CQ
     if codec_dst == "AV1":
-        pix = "p010le" if depth >= 10 else "p010le"
+        pix = "p010le" if depth >= 10 else "yuv420p10le"
         if gpu == "NVIDIA":
             p7 = "p7" if cq <= 18 else ("p6" if cq <= 28 else "p4")
             return f"-c:v av1_nvenc -preset {p7} -cq {cq} -pix_fmt {pix}"
@@ -503,7 +494,6 @@ def auto_compute_cq(src_info: dict, codec_dst: str, gpu: str,
         if gpu == "Intel":
             p = "veryslow" if cq <= 18 else ("medium" if cq <= 28 else "faster")
             return f"-c:v av1_qsv -preset {p} -global_quality {cq} -pix_fmt yuv420p"
-        # CPU
         pr = 3 if cq <= 18 else (6 if cq <= 28 else 9)
         return f"-c:v libsvtav1 -preset {pr} -crf {cq} -pix_fmt {pix}"
     if codec_dst == "H.264":
@@ -533,6 +523,166 @@ def auto_compute_cq(src_info: dict, codec_dst: str, gpu: str,
         p = "slow" if cq <= 18 else ("medium" if cq <= 28 else "faster")
         return f"-c:v libx265 -preset {p} -crf {cq} -pix_fmt {pix}"
     return ""
+
+
+def probe_video_bpp(path: str, sample_seconds: int = 0) -> float:
+    """
+    Calcola il BPP (bits per pixel per frame) effettivo dal video.
+    Se sample_seconds > 0 analizza solo i primi N secondi (più veloce).
+    Usa ffprobe packet-level per leggere i byte reali frame per frame.
+    Ritorna il bpp medio, o 0.0 se non riesce.
+    """
+    try:
+        extra = ["-read_intervals", f"%+{sample_seconds}"] if sample_seconds > 0 else []
+        r = subprocess.run(
+            [FFPROBE_BIN, "-v", "quiet", "-select_streams", "v:0",
+             "-show_packets", "-show_entries", "packet=size,duration_time",
+             "-of", "default=noprint_wrappers=1"] + extra + [path],
+            capture_output=True, text=True, timeout=60
+        )
+        sizes = []
+        for line in r.stdout.splitlines():
+            if line.startswith("size="):
+                v = line.split("=", 1)[1].strip()
+                if v.isdigit():
+                    sizes.append(int(v))
+        if not sizes:
+            return 0.0
+        avg_bytes = sum(sizes) / len(sizes)
+        return 0.0  # ritorna solo i bytes, risoluzione serve separata
+    except Exception:
+        return 0.0
+
+
+def compute_bpp_from_probe(src_info: dict, sample_path: str = "",
+                            sample_seconds: int = 0) -> float:
+    """
+    Calcola BPP reale da ffprobe packet-level.
+    Fallback al BPP stimato dal bitrate se ffprobe fallisce.
+    """
+    width   = src_info["width"]
+    height  = src_info["height"]
+    fps     = max(src_info["fps"], 1.0)
+    bitrate = src_info["bitrate"]
+    pixels  = width * height
+
+    if sample_path:
+        try:
+            extra = ["-read_intervals", f"%+{sample_seconds}"] if sample_seconds > 0 else []
+            r = subprocess.run(
+                [FFPROBE_BIN, "-v", "quiet", "-select_streams", "v:0",
+                 "-show_packets", "-show_entries", "packet=size",
+                 "-of", "default=noprint_wrappers=1"] + extra + [sample_path],
+                capture_output=True, text=True, timeout=60
+            )
+            sizes = []
+            for line in r.stdout.splitlines():
+                if line.startswith("size="):
+                    v = line.split("=", 1)[1].strip()
+                    if v.isdigit() and int(v) > 0:
+                        sizes.append(int(v))
+            if sizes:
+                # bytes medi per frame → bits per pixel per frame
+                avg_bits = (sum(sizes) / len(sizes)) * 8
+                bpp = avg_bits / max(pixels, 1)
+                return bpp
+        except Exception:
+            pass
+
+    # fallback: stima da bitrate dichiarato
+    codec_src  = src_info["codec"]
+    efficiency = CODEC_EFFICIENCY.get(codec_src, 1.0)
+    if codec_src == "prores":
+        p = str(src_info.get("profile", "0")).lower()
+        for k, v in PRORES_PROFILE_EFFICIENCY.items():
+            if k in p or p == k:
+                efficiency = v
+                break
+    bitrate_equiv = bitrate * efficiency
+    bpp = (bitrate_equiv / fps) / max(pixels, 1)
+    return bpp
+
+
+def auto_compute_cq(src_info: dict, codec_dst: str, gpu: str,
+                    dst_width: int, dst_height: int,
+                    auto_params: dict = None) -> str:
+    """
+    Calcola i parametri video ottimali per il codec di destinazione.
+    auto_params: dizionario con le opzioni del dialogo AUTO:
+        - use_bpp_probe: bool  (usa packet-level BPP invece di stima bitrate)
+        - cap_mode: "none" | "size_mb" | "size_pct"
+        - cap_value: float  (MB per file singolo, % per cartella)
+        - duration_s: float  (durata del video in secondi, serve per cap)
+        - src_file_bytes: int  (peso file sorgente, per cap percentuale)
+    Ritorna la stringa di parametri ffmpeg.
+    """
+    if auto_params is None:
+        auto_params = {}
+
+    fps     = max(src_info["fps"], 1.0)
+    depth   = src_info["depth"]
+    dst_pixels = max(dst_width * dst_height, 1)
+
+    # per DNxHR/ProRes non si usa CQ — profilo fisso
+    if codec_dst in ("DNxHR", "ProRes"):
+        return auto_mezzanine_profile(codec_dst, dst_width, dst_height, depth)
+
+    # ── cap dimensione: calcola bitrate target ─────────────────────────────
+    cap_mode  = auto_params.get("cap_mode", "none")
+    cap_value = float(auto_params.get("cap_value", 0))
+    duration  = float(auto_params.get("duration_s", 0))
+    src_bytes = int(auto_params.get("src_file_bytes", 0))
+
+    bitrate_target_kbps = 0
+    if cap_mode != "none" and duration > 0 and cap_value > 0:
+        if cap_mode == "size_mb":
+            # cap assoluto in MB → bitrate totale (video+audio)
+            # togliamo ~192kbps per audio, resto al video
+            target_bits = cap_value * 8 * 1024 * 1024
+            audio_bits  = 192_000 * duration
+            video_bits  = max(target_bits - audio_bits, 0)
+            bitrate_target_kbps = int(video_bits / duration / 1000)
+        elif cap_mode == "size_pct" and src_bytes > 0:
+            # riduzione percentuale sul peso del file sorgente
+            target_bytes = src_bytes * (1.0 - cap_value / 100.0)
+            target_bits  = target_bytes * 8
+            audio_bits   = 192_000 * duration
+            video_bits   = max(target_bits - audio_bits, 0)
+            bitrate_target_kbps = int(video_bits / duration / 1000)
+
+    if bitrate_target_kbps > 0:
+        # minimo ragionevole per non ottenere un file inutilizzabile
+        min_kbps = {"H.264": 200, "H.265": 150, "AV1": 100}.get(codec_dst, 150)
+        bitrate_target_kbps = max(bitrate_target_kbps, min_kbps)
+        return _build_video_params(codec_dst, gpu, 0, depth, bitrate_target_kbps)
+
+    # ── stima CQ da BPP reale ──────────────────────────────────────────────
+    use_probe = auto_params.get("use_bpp_probe", False)
+    src_file  = auto_params.get("src_file", "")
+    bpp = compute_bpp_from_probe(src_info,
+                                  sample_path=src_file if use_probe else "",
+                                  sample_seconds=0)
+
+    # normalizza il BPP alla risoluzione di DESTINAZIONE
+    src_pixels = max(src_info["width"] * src_info["height"], 1)
+    bpp_dst = bpp * (src_pixels / dst_pixels)
+
+    # determina range risoluzione destinazione per delta
+    dst_height = dst_height or src_info["height"]
+    if dst_height >= 4320:    res_key = "8K UHD"
+    elif dst_height >= 2160:  res_key = "4K UHD"
+    elif dst_height >= 1440:  res_key = "1440p QHD"
+    elif dst_height >= 1080:  res_key = "1080p"
+    elif dst_height >= 720:   res_key = "720p"
+    else:                     res_key = "480p"
+
+    cq = (AUTO_BASE_CQ.get(codec_dst, 24)
+          + AUTO_DELTA_RES.get(res_key, 0)
+          + auto_delta_fps(fps)
+          + auto_delta_depth(depth)
+          + auto_delta_bpp(bpp_dst))
+    cq = max(8, min(51, cq))
+    return _build_video_params(codec_dst, gpu, cq, depth)
 
 # ============================================================
 #  TRADUZIONI / TRANSLATIONS / ÜBERSETZUNGEN / TRADUCCIONES
@@ -810,6 +960,190 @@ TRANSLATIONS = {
         "it": "🔒  Torna a modalità automatica", "en": "🔒  Back to automatic mode",
         "de": "🔒  Zurück zum automatischen Modus", "es": "🔒  Volver al modo automático",
         "doge": "🔒  no touch. auto now. wow",
+    },
+    # ── Dialog AUTO avanzato ──────────────────────────────────
+    "dlg_auto_title": {
+        "it": "Impostazioni modalità AUTO",
+        "en": "AUTO mode settings",
+        "de": "AUTO-Modus Einstellungen",
+        "es": "Configuración modo AUTO",
+        "doge": "AUTO settings wow",
+    },
+    "grp_auto_analysis": {
+        "it": "Analisi qualità",
+        "en": "Quality analysis",
+        "de": "Qualitätsanalyse",
+        "es": "Análisis de calidad",
+        "doge": "how good? analysis",
+    },
+    "chk_auto_bpp_probe": {
+        "it": "Analisi BPP reale (legge i frame effettivi con ffprobe)",
+        "en": "Real BPP analysis (reads actual frames with ffprobe)",
+        "de": "Echte BPP-Analyse (liest tatsächliche Frames mit ffprobe)",
+        "es": "Análisis BPP real (lee frames reales con ffprobe)",
+        "doge": "real frame scan wow",
+    },
+    "lbl_auto_bpp_probe_info": {
+        "it": "ℹ  Più preciso del bitrate dichiarato nel container.\nSu file grandi o cartelle può richiedere qualche minuto in più.",
+        "en": "ℹ  More accurate than the bitrate declared in the container.\nOn large files or folders it may take a few extra minutes.",
+        "de": "ℹ  Genauer als die im Container angegebene Bitrate.\nBei großen Dateien oder Ordnern kann es einige Minuten länger dauern.",
+        "es": "ℹ  Más preciso que el bitrate declarado en el container.\nEn archivos grandes o carpetas puede tardar algunos minutos más.",
+        "doge": "ℹ  more precise. much slow on big folder. wow.",
+    },
+    "grp_auto_cap": {
+        "it": "Cap dimensione output",
+        "en": "Output size cap",
+        "de": "Ausgabegröße begrenzen",
+        "es": "Límite de tamaño de salida",
+        "doge": "size limit wow",
+    },
+    "rb_cap_none": {
+        "it": "Nessun cap (qualità ottimale)",
+        "en": "No cap (optimal quality)",
+        "de": "Kein Limit (optimale Qualität)",
+        "es": "Sin límite (calidad óptima)",
+        "doge": "no cap. such quality. wow",
+    },
+    "rb_cap_mb": {
+        "it": "Dimensione massima assoluta (solo file singolo)",
+        "en": "Maximum absolute size (single file only)",
+        "de": "Maximale absolute Größe (nur Einzeldatei)",
+        "es": "Tamaño máximo absoluto (solo archivo único)",
+        "doge": "max size MB. single file wow",
+    },
+    "rb_cap_pct": {
+        "it": "Riduci del % rispetto all'originale (file singolo e cartella)",
+        "en": "Reduce by % compared to original (single file and folder)",
+        "de": "Um % gegenüber dem Original reduzieren (Einzel- und Ordner)",
+        "es": "Reducir en % respecto al original (archivo único y carpeta)",
+        "doge": "shrink by %. much smaller. wow",
+    },
+    "lbl_cap_mb_value": {
+        "it": "Dimensione massima:", "en": "Maximum size:",
+        "de": "Maximale Größe:", "es": "Tamaño máximo:",
+        "doge": "max how big?:",
+    },
+    "lbl_cap_pct_value": {
+        "it": "Riduzione %:", "en": "Reduction %:",
+        "de": "Reduktion %:", "es": "Reducción %:",
+        "doge": "shrink how much?:",
+    },
+    "lbl_cap_warn": {
+        "it": "⚠  Il cap usa bitrate target (VBR). Il peso finale può variare del ±10% rispetto al valore impostato.\nContenuti semplici (screencast, animazioni) tendono a essere più piccoli del target.",
+        "en": "⚠  The cap uses target bitrate (VBR). Final size may vary ±10% from the set value.\nSimple content (screencasts, animations) tends to be smaller than the target.",
+        "de": "⚠  Das Limit verwendet Ziel-Bitrate (VBR). Die endgültige Größe kann ±10% abweichen.\nEinfache Inhalte (Screencasts, Animationen) sind oft kleiner als das Ziel.",
+        "es": "⚠  El límite usa bitrate objetivo (VBR). El tamaño final puede variar ±10%.\nContenido simple (screencasts, animaciones) tiende a ser más pequeño que el objetivo.",
+        "doge": "⚠  cap = VBR target. maybe ±10% off. simple video = smaller. wow.",
+    },
+    "btn_auto_ok": {
+        "it": "✔  Conferma impostazioni AUTO",
+        "en": "✔  Confirm AUTO settings",
+        "de": "✔  AUTO-Einstellungen bestätigen",
+        "es": "✔  Confirmar configuración AUTO",
+        "doge": "✔  confirm wow",
+    },
+    "btn_auto_cancel": {
+        "it": "Annulla", "en": "Cancel", "de": "Abbrechen", "es": "Cancelar",
+        "doge": "nope",
+    },
+    "btn_auto_settings": {
+        "it": "⚙  Impostazioni AUTO…", "en": "⚙  AUTO settings…",
+        "de": "⚙  AUTO-Einstellungen…", "es": "⚙  Configuración AUTO…",
+        "doge": "⚙  AUTO settings wow",
+    },
+    "btn_save_preset": {
+        "it": "💾  Salva preset", "en": "💾  Save preset",
+        "de": "💾  Preset speichern", "es": "💾  Guardar preset",
+        "doge": "💾  save command wow",
+    },
+    "btn_load_preset": {
+        "it": "📂  Carica preset", "en": "📂  Load preset",
+        "de": "📂  Preset laden", "es": "📂  Cargar preset",
+        "doge": "📂  load command wow",
+    },
+    "dlg_preset_save_title": {
+        "it": "Salva preset ffmpeg", "en": "Save ffmpeg preset",
+        "de": "FFmpeg-Preset speichern", "es": "Guardar preset ffmpeg",
+        "doge": "save preset wow",
+    },
+    "dlg_preset_save_label": {
+        "it": "Nome del preset:", "en": "Preset name:",
+        "de": "Preset-Name:", "es": "Nombre del preset:",
+        "doge": "what name? wow:",
+    },
+    "dlg_preset_save_placeholder": {
+        "it": "Es: H264 Instagram, ProRes Edit...", "en": "E.g: H264 Instagram, ProRes Edit...",
+        "de": "Z.B: H264 Instagram, ProRes Edit...", "es": "Ej: H264 Instagram, ProRes Edit...",
+        "doge": "such name. very describe. wow",
+    },
+    "dlg_preset_load_title": {
+        "it": "Carica preset ffmpeg", "en": "Load ffmpeg preset",
+        "de": "FFmpeg-Preset laden", "es": "Cargar preset ffmpeg",
+        "doge": "load preset wow",
+    },
+    "dlg_preset_no_presets": {
+        "it": "Nessun preset salvato.", "en": "No saved presets.",
+        "de": "Keine gespeicherten Presets.", "es": "No hay presets guardados.",
+        "doge": "no preset. much empty. wow.",
+    },
+    "dlg_preset_cmd_label": {
+        "it": "Comando:", "en": "Command:",
+        "de": "Befehl:", "es": "Comando:",
+        "doge": "such command:",
+    },
+    "dlg_preset_delete": {
+        "it": "🗑  Elimina", "en": "🗑  Delete",
+        "de": "🗑  Löschen", "es": "🗑  Eliminar",
+        "doge": "🗑  bye bye",
+    },
+    "dlg_preset_use": {
+        "it": "✔  Usa questo preset", "en": "✔  Use this preset",
+        "de": "✔  Dieses Preset verwenden", "es": "✔  Usar este preset",
+        "doge": "✔  use it wow",
+    },
+    "dlg_preset_warn_empty": {
+        "it": "Inserisci un nome per il preset.", "en": "Please enter a preset name.",
+        "de": "Bitte einen Preset-Namen eingeben.", "es": "Por favor ingresa un nombre para el preset.",
+        "doge": "pls type name. much empty. wow.",
+    },
+    "dlg_preset_warn_no_cmd": {
+        "it": "Il comando è vuoto. Abilita prima la modalità manuale e scrivi un comando.",
+        "en": "The command is empty. Enable manual mode first and type a command.",
+        "de": "Der Befehl ist leer. Aktiviere zuerst den manuellen Modus und gib einen Befehl ein.",
+        "es": "El comando está vacío. Habilita el modo manual primero y escribe un comando.",
+        "doge": "command empty. type something first. wow.",
+    },
+    "dlg_preset_export_title": {
+        "it": "Esporta preset in JSON", "en": "Export presets to JSON",
+        "de": "Presets als JSON exportieren", "es": "Exportar presets a JSON",
+        "doge": "export preset wow",
+    },
+    "dlg_preset_import_title": {
+        "it": "Importa preset da JSON", "en": "Import presets from JSON",
+        "de": "Presets aus JSON importieren", "es": "Importar presets desde JSON",
+        "doge": "import preset wow",
+    },
+    "dlg_preset_import_ok": {
+        "it": "Preset importati con successo!", "en": "Presets imported successfully!",
+        "de": "Presets erfolgreich importiert!", "es": "¡Presets importados con éxito!",
+        "doge": "import done! such success! wow!",
+    },
+    "dlg_preset_import_err": {
+        "it": "Errore durante l'importazione. Il file non è valido.",
+        "en": "Import error. The file is not valid.",
+        "de": "Importfehler. Die Datei ist ungültig.",
+        "es": "Error de importación. El archivo no es válido.",
+        "doge": "oops. bad file. much error. wow.",
+    },
+    "btn_preset_export": {
+        "it": "⬆  Esporta JSON", "en": "⬆  Export JSON",
+        "de": "⬆  JSON exportieren", "es": "⬆  Exportar JSON",
+        "doge": "⬆  export wow",
+    },
+    "btn_preset_import": {
+        "it": "⬇  Importa JSON", "en": "⬇  Import JSON",
+        "de": "⬇  JSON importieren", "es": "⬇  Importar JSON",
+        "doge": "⬇  import wow",
     },
     "lbl_hint": {
         "it": "Usa {INPUT} e {OUTPUT} come segnaposto",
@@ -1489,6 +1823,364 @@ class LicenseDialog(QDialog):
         btn.rejected.connect(self.accept)
         lay.addWidget(btn)
 # ============================================================
+#  GESTIONE PRESET FFMPEG
+# ============================================================
+PRESETS_KEY = "ffmpeg_presets"  # chiave nel config JSON
+
+def load_ffmpeg_presets() -> dict:
+    """Restituisce il dizionario {nome: comando} dei preset salvati."""
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            cfg = json.load(f)
+        return cfg.get(PRESETS_KEY, {})
+    except Exception:
+        return {}
+
+def save_ffmpeg_preset(name: str, command: str):
+    """Salva o sovrascrive un preset nel config JSON."""
+    try:
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                cfg = json.load(f)
+        except Exception:
+            cfg = {}
+        if PRESETS_KEY not in cfg:
+            cfg[PRESETS_KEY] = {}
+        cfg[PRESETS_KEY][name] = command
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(cfg, f, indent=2)
+    except Exception:
+        pass
+
+def delete_ffmpeg_preset(name: str):
+    """Rimuove un preset dal config JSON."""
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            cfg = json.load(f)
+        if PRESETS_KEY in cfg and name in cfg[PRESETS_KEY]:
+            del cfg[PRESETS_KEY][name]
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(cfg, f, indent=2)
+    except Exception:
+        pass
+
+# ============================================================
+#  DIALOG IMPOSTAZIONI AUTO
+# ============================================================
+class AutoSettingsDialog(QDialog):
+    """
+    Dialog per configurare la modalità AUTO avanzata:
+    - analisi BPP reale via ffprobe packet-level
+    - cap dimensione assoluto (MB/GB) per file singolo
+    - cap percentuale (riduzione % sul peso originale) per file singolo e cartella
+    """
+    def __init__(self, is_folder: bool, current: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(T("dlg_auto_title"))
+        self.resize(520, 420)
+        self.is_folder = is_folder
+        lay = QVBoxLayout(self)
+        lay.setSpacing(10)
+
+        # ── Sezione analisi qualità ────────────────────────────
+        grp_analysis = QGroupBox(T("grp_auto_analysis"))
+        aly = QVBoxLayout(grp_analysis)
+        self.chk_bpp_probe = QCheckBox(T("chk_auto_bpp_probe"))
+        self.chk_bpp_probe.setChecked(current.get("use_bpp_probe", False))
+        aly.addWidget(self.chk_bpp_probe)
+        lbl_bpp_info = QLabel(T("lbl_auto_bpp_probe_info"))
+        lbl_bpp_info.setStyleSheet("color:#888899; font-size:11px; font-style:italic; padding-left:22px;")
+        lbl_bpp_info.setWordWrap(True)
+        aly.addWidget(lbl_bpp_info)
+        lay.addWidget(grp_analysis)
+
+        # ── Sezione cap dimensione ─────────────────────────────
+        grp_cap = QGroupBox(T("grp_auto_cap"))
+        cly = QVBoxLayout(grp_cap)
+
+        self.bg_cap = QButtonGroup(self)
+        self.rb_cap_none = QRadioButton(T("rb_cap_none"))
+        self.rb_cap_mb   = QRadioButton(T("rb_cap_mb"))
+        self.rb_cap_pct  = QRadioButton(T("rb_cap_pct"))
+
+        # cartella: solo % disponibile
+        if is_folder:
+            self.rb_cap_mb.setEnabled(False)
+
+        self.bg_cap.addButton(self.rb_cap_none, 0)
+        self.bg_cap.addButton(self.rb_cap_mb,   1)
+        self.bg_cap.addButton(self.rb_cap_pct,  2)
+
+        cap_mode = current.get("cap_mode", "none")
+        if cap_mode == "size_mb" and not is_folder:
+            self.rb_cap_mb.setChecked(True)
+        elif cap_mode == "size_pct":
+            self.rb_cap_pct.setChecked(True)
+        else:
+            self.rb_cap_none.setChecked(True)
+
+        cly.addWidget(self.rb_cap_none)
+        cly.addWidget(self.rb_cap_mb)
+        cly.addWidget(self.rb_cap_pct)
+
+        # ── riga valore MB ──
+        self.row_mb = QWidget()
+        mb_lay = QHBoxLayout(self.row_mb)
+        mb_lay.setContentsMargins(22, 0, 0, 0)
+        mb_lay.addWidget(QLabel(T("lbl_cap_mb_value")))
+        self.spin_mb = QLineEdit()
+        self.spin_mb.setPlaceholderText("Es: 500 MB, 1.5 GB")
+        self.spin_mb.setFixedWidth(120)
+        cap_val = current.get("cap_value", 500)
+        cap_unit = current.get("cap_unit", "MB")
+        self.spin_mb.setText(str(cap_val))
+        self.cmb_mb_unit = QComboBox()
+        self.cmb_mb_unit.addItems(["MB", "GB"])
+        self.cmb_mb_unit.setCurrentText(cap_unit)
+        self.cmb_mb_unit.setFixedWidth(60)
+        mb_lay.addWidget(self.spin_mb)
+        mb_lay.addWidget(self.cmb_mb_unit)
+        mb_lay.addStretch()
+        cly.addWidget(self.row_mb)
+
+        # ── riga valore % ──
+        self.row_pct = QWidget()
+        pct_lay = QHBoxLayout(self.row_pct)
+        pct_lay.setContentsMargins(22, 0, 0, 0)
+        pct_lay.addWidget(QLabel(T("lbl_cap_pct_value")))
+        self.spin_pct = QLineEdit()
+        self.spin_pct.setPlaceholderText("1 – 99")
+        self.spin_pct.setFixedWidth(80)
+        pct_default = current.get("cap_value", 50) if cap_mode == "size_pct" else 50
+        self.spin_pct.setText(str(pct_default))
+        lbl_pct_sym = QLabel("%")
+        pct_lay.addWidget(self.spin_pct)
+        pct_lay.addWidget(lbl_pct_sym)
+        pct_lay.addStretch()
+        cly.addWidget(self.row_pct)
+
+        # ── warning VBR ──
+        self.lbl_cap_warn = QLabel(T("lbl_cap_warn"))
+        self.lbl_cap_warn.setWordWrap(True)
+        self.lbl_cap_warn.setStyleSheet("color:#cc8800; font-size:11px; font-style:italic; padding:4px 0;")
+        cly.addWidget(self.lbl_cap_warn)
+
+        lay.addWidget(grp_cap)
+
+        # ── bottoni ───────────────────────────────────────────
+        btn_row = QHBoxLayout()
+        btn_ok = QPushButton(T("btn_auto_ok"))
+        btn_ok.setObjectName("btn_primary")
+        btn_ok.clicked.connect(self.accept)
+        btn_cancel = QPushButton(T("btn_auto_cancel"))
+        btn_cancel.clicked.connect(self.reject)
+        btn_row.addStretch()
+        btn_row.addWidget(btn_ok)
+        btn_row.addWidget(btn_cancel)
+        lay.addLayout(btn_row)
+
+        # collegamento segnali
+        self.bg_cap.buttonClicked.connect(self._update_rows)
+        self._update_rows()
+
+    def _update_rows(self):
+        mode = self.bg_cap.checkedId()
+        self.row_mb.setVisible(mode == 1)
+        self.row_pct.setVisible(mode == 2)
+        self.lbl_cap_warn.setVisible(mode in (1, 2))
+
+    def get_settings(self) -> dict:
+        """Ritorna il dizionario con le impostazioni scelte."""
+        mode_id = self.bg_cap.checkedId()
+        if mode_id == 1:
+            cap_mode = "size_mb"
+            try:
+                raw = float(self.spin_mb.text().replace(",", "."))
+            except ValueError:
+                raw = 500.0
+            unit = self.cmb_mb_unit.currentText()
+            cap_value = raw * 1024 if unit == "GB" else raw  # tutto in MB
+            cap_unit  = unit
+        elif mode_id == 2:
+            cap_mode = "size_pct"
+            try:
+                cap_value = max(1.0, min(99.0, float(self.spin_pct.text().replace(",", "."))))
+            except ValueError:
+                cap_value = 50.0
+            cap_unit = "%"
+        else:
+            cap_mode  = "none"
+            cap_value = 0.0
+            cap_unit  = ""
+        return {
+            "use_bpp_probe": self.chk_bpp_probe.isChecked(),
+            "cap_mode":      cap_mode,
+            "cap_value":     cap_value,
+            "cap_unit":      cap_unit,
+        }
+
+
+class FfmpegPresetSaveDialog(QDialog):
+    """Dialogo per salvare il comando corrente come preset."""
+    def __init__(self, current_cmd: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(T("dlg_preset_save_title"))
+        self.resize(480, 200)
+        lay = QVBoxLayout(self)
+
+        lay.addWidget(QLabel(T("dlg_preset_save_label")))
+        self.txt_name = QLineEdit()
+        self.txt_name.setPlaceholderText(T("dlg_preset_save_placeholder"))
+        lay.addWidget(self.txt_name)
+
+        lay.addWidget(QLabel(T("dlg_preset_cmd_label")))
+        self.txt_cmd = QLineEdit()
+        self.txt_cmd.setText(current_cmd)
+        self.txt_cmd.setFont(QFont("monospace", 10))
+        self.txt_cmd.setStyleSheet(
+            "background:#0d0d1a; color:#00ff88; border:1px solid #2d2d4e;"
+            "border-radius:6px; padding:6px 10px;")
+        lay.addWidget(self.txt_cmd)
+
+        btns = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        btns.accepted.connect(self._on_save)
+        btns.rejected.connect(self.reject)
+        lay.addWidget(btns)
+
+    def _on_save(self):
+        name = self.txt_name.text().strip()
+        if not name:
+            QMessageBox.warning(self, T("dlg_warn_title"), T("dlg_preset_warn_empty"))
+            return
+        self.accept()
+
+
+class FfmpegPresetLoadDialog(QDialog):
+    """Dialogo per sfogliare, caricare, esportare e importare preset."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(T("dlg_preset_load_title"))
+        self.resize(620, 440)
+        self.selected_cmd = None
+
+        lay = QVBoxLayout(self)
+
+        self.presets = load_ffmpeg_presets()
+
+        if not self.presets:
+            lay.addWidget(QLabel(T("dlg_preset_no_presets")))
+            btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+            btns.rejected.connect(self.reject)
+            btn_row = QHBoxLayout()
+            btn_import = QPushButton(T("btn_preset_import"))
+            btn_import.clicked.connect(self._import_presets)
+            btn_row.addWidget(btn_import)
+            btn_row.addStretch()
+            lay.addLayout(btn_row)
+            lay.addWidget(btns)
+            return
+
+        from PyQt6.QtWidgets import QListWidget
+        self.list_widget = QListWidget()
+        for name in self.presets:
+            self.list_widget.addItem(name)
+        self.list_widget.setCurrentRow(0)
+        self.list_widget.currentTextChanged.connect(self._on_selection_changed)
+        lay.addWidget(self.list_widget)
+
+        lay.addWidget(QLabel(T("dlg_preset_cmd_label")))
+        self.lbl_cmd = QLineEdit()
+        self.lbl_cmd.setReadOnly(True)
+        self.lbl_cmd.setFont(QFont("monospace", 10))
+        self.lbl_cmd.setStyleSheet(
+            "background:#0d0d1a; color:#00ff88; border:1px solid #2d2d4e;"
+            "border-radius:6px; padding:6px 10px;")
+        lay.addWidget(self.lbl_cmd)
+
+        btn_row = QHBoxLayout()
+        btn_use = QPushButton(T("dlg_preset_use"))
+        btn_use.setObjectName("btn_primary")
+        btn_use.clicked.connect(self._use_preset)
+        btn_delete = QPushButton(T("dlg_preset_delete"))
+        btn_delete.setObjectName("btn_danger")
+        btn_delete.clicked.connect(self._delete_preset)
+        btn_export = QPushButton(T("btn_preset_export"))
+        btn_export.clicked.connect(self._export_presets)
+        btn_import = QPushButton(T("btn_preset_import"))
+        btn_import.clicked.connect(self._import_presets)
+        btn_close = QPushButton(T("dlg_theme_cancel"))
+        btn_close.clicked.connect(self.reject)
+        btn_row.addWidget(btn_use)
+        btn_row.addWidget(btn_delete)
+        btn_row.addStretch()
+        btn_row.addWidget(btn_export)
+        btn_row.addWidget(btn_import)
+        btn_row.addWidget(btn_close)
+        lay.addLayout(btn_row)
+
+        if self.presets:
+            first = next(iter(self.presets))
+            self.lbl_cmd.setText(self.presets[first])
+
+    def _on_selection_changed(self, name):
+        cmd = self.presets.get(name, "")
+        self.lbl_cmd.setText(cmd)
+
+    def _use_preset(self):
+        item = self.list_widget.currentItem()
+        if item:
+            self.selected_cmd = self.presets.get(item.text(), "")
+            self.accept()
+
+    def _delete_preset(self):
+        item = self.list_widget.currentItem()
+        if not item:
+            return
+        name = item.text()
+        delete_ffmpeg_preset(name)
+        del self.presets[name]
+        row = self.list_widget.currentRow()
+        self.list_widget.takeItem(row)
+        if self.list_widget.count() > 0:
+            self.list_widget.setCurrentRow(max(0, row - 1))
+            new_item = self.list_widget.currentItem()
+            if new_item:
+                self.lbl_cmd.setText(self.presets.get(new_item.text(), ""))
+        else:
+            self.lbl_cmd.setText("")
+
+    def _export_presets(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, T("dlg_preset_export_title"), "ffmpeg_presets.json",
+            "JSON (*.json);;Tutti i file (*)")
+        if path:
+            try:
+                with open(path, "w") as f:
+                    json.dump(self.presets, f, indent=2)
+            except Exception as e:
+                QMessageBox.warning(self, T("dlg_warn_title"), str(e))
+
+    def _import_presets(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, T("dlg_preset_import_title"), "",
+            "JSON (*.json);;Tutti i file (*)")
+        if not path:
+            return
+        try:
+            with open(path, "r") as f:
+                imported = json.load(f)
+            if not isinstance(imported, dict):
+                raise ValueError("not a dict")
+            for name, cmd in imported.items():
+                save_ffmpeg_preset(str(name), str(cmd))
+            QMessageBox.information(
+                self, T("dlg_preset_save_title"), T("dlg_preset_import_ok"))
+            self.reject()
+        except Exception:
+            QMessageBox.warning(self, T("dlg_warn_title"), T("dlg_preset_import_err"))
+
+# ============================================================
 #  THREAD DI CONVERSIONE
 # ============================================================
 class ConvertThread(QThread):
@@ -1504,15 +2196,21 @@ class ConvertThread(QThread):
         self.verbose_log = params.get("verbose_log", False)
     def stop(self):
         self._stop = True
-    def get_video_opts(self, src_info, dst_width, dst_height):
+    def get_video_opts(self, src_info, dst_width, dst_height,
+                       src_file: str = "", src_file_bytes: int = 0,
+                       duration_s: float = 0.0):
         """Ritorna la stringa di parametri video (AUTO o preset fisso)."""
         gpu    = self.params.get("gpu", "NVIDIA")
         vcodec = self.params.get("vcodec", "AV1")
         vqual  = self.params.get("vqual", "Medio")
         if vqual == "AUTO":
-            return auto_compute_cq(src_info, vcodec, gpu, dst_width, dst_height)
+            auto_s = dict(self.params.get("auto_settings", {}))
+            auto_s["src_file"]       = src_file
+            auto_s["src_file_bytes"] = src_file_bytes
+            auto_s["duration_s"]     = duration_s
+            return auto_compute_cq(src_info, vcodec, gpu, dst_width, dst_height, auto_s)
         if vcodec in ("DNxHR", "ProRes"):
-            return VIDEO_PRESETS[vcodec][vqual]
+            return VIDEO_PRESETS.get(vcodec, {}).get(vqual, "")
         return VIDEO_PRESETS.get(gpu, {}).get(vcodec, {}).get(vqual, "")
     def get_scale_filter(self, src_info, res_key):
         """Ritorna il filtro -vf scale=... o stringa vuota se nessun scaling."""
@@ -1527,7 +2225,8 @@ class ConvertThread(QThread):
         if dims:
             return dims
         return src_info["width"], src_info["height"]
-    def build_cmd(self, src, dst, src_info):
+    def build_cmd(self, src, dst, src_info,
+                  src_file_bytes: int = 0, duration_s: float = 0.0):
         # modalità manuale
         manual = self.params.get("manual_cmd", "")
         if manual:
@@ -1554,7 +2253,12 @@ class ConvertThread(QThread):
             cmd += ["-vn"] + audio_opts + sr_flag + [dst, "-y", "-progress", "pipe:1"]
         else:
             dst_w, dst_h = self.get_dst_dims(src_info, res_key)
-            video_opts   = self.get_video_opts(src_info, dst_w, dst_h).split()
+            video_opts   = self.get_video_opts(
+                src_info, dst_w, dst_h,
+                src_file=src,
+                src_file_bytes=src_file_bytes,
+                duration_s=duration_s,
+            ).split()
             scale_filter = self.get_scale_filter(src_info, res_key)
             if scale_filter:
                 cmd += ["-vf", scale_filter]
@@ -1602,14 +2306,24 @@ class ConvertThread(QThread):
                 self.file_done.emit(fname, success)
                 continue
             # ── Conversione FFmpeg ──
+            duration = self.get_duration(src) if self.params["mode"] != "image" else 0.0
+            # calcola peso sorgente per cap %
+            try:
+                src_file_bytes = os.path.getsize(src)
+            except Exception:
+                src_file_bytes = 0
             # se AUTO, mostra i parametri calcolati
             if self.params.get("vqual") == "AUTO" and self.params["mode"] == "video":
                 res_key = self.params.get("resolution", "Mantieni originale")
                 dst_w, dst_h = self.get_dst_dims(src_info, res_key)
-                computed = self.get_video_opts(src_info, dst_w, dst_h)
+                computed = self.get_video_opts(src_info, dst_w, dst_h,
+                                               src_file=src,
+                                               src_file_bytes=src_file_bytes,
+                                               duration_s=duration)
                 self.log_line.emit(f"  [AUTO] {computed}")
-            duration = self.get_duration(src) if self.params["mode"] != "image" else 0.0
-            cmd = self.build_cmd(src, dst, src_info)
+            cmd = self.build_cmd(src, dst, src_info,
+                                 src_file_bytes=src_file_bytes,
+                                 duration_s=duration)
             self.log_line.emit("  $ " + " ".join(cmd))
             try:
                 proc = subprocess.Popen(
@@ -1673,6 +2387,13 @@ class MainWindow(QMainWindow):
         self.params = {}
         self.jobs   = []
         self.thread = None
+        # impostazioni dialogo AUTO (persistono durante la sessione)
+        self._auto_settings = {
+            "use_bpp_probe": False,
+            "cap_mode":      "none",
+            "cap_value":     0.0,
+            "cap_unit":      "",
+        }
         self._build_ui()
     def _build_ui(self):
         central = QWidget()
@@ -1824,6 +2545,10 @@ class MainWindow(QMainWindow):
         self.lbl_auto_warn.setObjectName("auto_warn")
         self.lbl_auto_warn.setVisible(False)
         vq_row.addWidget(self.lbl_auto_warn)
+        self.btn_auto_settings = QPushButton(T("btn_auto_settings"))
+        self.btn_auto_settings.setVisible(False)
+        self.btn_auto_settings.clicked.connect(self._open_auto_settings)
+        vq_row.addWidget(self.btn_auto_settings)
         vq_row.addStretch()
         vlay.addLayout(vq_row)
         # risoluzione output
@@ -1952,9 +2677,15 @@ class MainWindow(QMainWindow):
         self.lbl_hint = QLabel(T("lbl_hint"))
         self.lbl_hint.setStyleSheet("color:#666688; font-size:11px;")
         self.lbl_hint.setVisible(False)
+        self.btn_save_preset = QPushButton(T("btn_save_preset"))
+        self.btn_save_preset.clicked.connect(self._save_ffmpeg_preset)
+        self.btn_load_preset = QPushButton(T("btn_load_preset"))
+        self.btn_load_preset.clicked.connect(self._load_ffmpeg_preset)
         cbr.addWidget(self.btn_manual)
         cbr.addWidget(self.lbl_hint)
         cbr.addStretch()
+        cbr.addWidget(self.btn_save_preset)
+        cbr.addWidget(self.btn_load_preset)
         clay.addLayout(cbr)
         self.opts_layout.addWidget(self.grp_cmd)
         # init
@@ -2143,6 +2874,8 @@ class MainWindow(QMainWindow):
         btn = self.bg_vqual.checkedButton()
         is_auto = btn and self.bg_vqual.id(btn) == 3
         self.lbl_auto_warn.setVisible(is_auto)
+        if hasattr(self, "btn_auto_settings"):
+            self.btn_auto_settings.setVisible(is_auto)
         # in AUTO il comando preview non può mostrare valori reali
         if is_auto:
             self.txt_cmd.setText(T("auto_cmd_preview"))
@@ -2163,8 +2896,12 @@ class MainWindow(QMainWindow):
         self._update_cmd_preview()
     def _on_container_changed(self, container):
         codecs = CONTAINER_CODECS.get(container, [])
+        # Blocca i segnali durante il cambio items per evitare crash su Python 3.14
+        # (currentTextChanged scatterebbe su items incompleti)
+        self.cmb_vcodec.blockSignals(True)
         self.cmb_vcodec.clear()
         self.cmb_vcodec.addItems(codecs)
+        self.cmb_vcodec.blockSignals(False)
         is_gpu = all(c not in ("DNxHR", "ProRes") for c in codecs)
         for btn in self.bg_gpu.buttons():
             btn.setEnabled(is_gpu)
@@ -2176,12 +2913,17 @@ class MainWindow(QMainWindow):
     def _get_video_preset_str(self):
         gpu    = self._get_selected_gpu()
         vcodec = self.cmb_vcodec.currentText()
-        vqual  = (self.bg_vqual.checkedButton().text()
-                  if self.bg_vqual.checkedButton() else "Medio")
-        if self.bg_vqual.id(self.bg_vqual.checkedButton()) == 3:
+        if not vcodec:
+            return ""
+        checked = self.bg_vqual.checkedButton()
+        if checked and self.bg_vqual.id(checked) == 3:
             return "[AUTO]"
+        # Mappa il testo localizzato della qualità back a chiave interna
+        _vqual_map = {0: "Alto", 1: "Medio", 2: "Basso", 3: "AUTO"}
+        vqual_id = self.bg_vqual.id(checked) if checked else 1
+        vqual = _vqual_map.get(vqual_id, "Medio")
         if vcodec in ("DNxHR", "ProRes"):
-            return VIDEO_PRESETS[vcodec][vqual]
+            return VIDEO_PRESETS.get(vcodec, {}).get(vqual, "")
         return VIDEO_PRESETS.get(gpu, {}).get(vcodec, {}).get(vqual, "")
     def _update_cmd_preview(self):
         if hasattr(self, "btn_manual") and self.btn_manual.isChecked():
@@ -2246,6 +2988,32 @@ class MainWindow(QMainWindow):
                 "background:#0d0d1a; color:#00ff88; border:1px solid #2d2d4e;"
                 "border-radius:6px; padding:6px 10px;")
             self._update_cmd_preview()
+    def _open_auto_settings(self):
+        is_folder = self.rb_folder.isChecked()
+        dlg = AutoSettingsDialog(is_folder, self._auto_settings, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self._auto_settings = dlg.get_settings()
+
+    def _save_ffmpeg_preset(self):
+        cmd = self.txt_cmd.text().strip()
+        if not cmd:
+            QMessageBox.warning(self, T("dlg_warn_title"), T("dlg_preset_warn_no_cmd"))
+            return
+        dlg = FfmpegPresetSaveDialog(cmd, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            name = dlg.txt_name.text().strip()
+            command = dlg.txt_cmd.text().strip()
+            save_ffmpeg_preset(name, command)
+
+    def _load_ffmpeg_preset(self):
+        dlg = FfmpegPresetLoadDialog(self)
+        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.selected_cmd:
+            # Attiva la modalità manuale e imposta il comando
+            if not self.btn_manual.isChecked():
+                self.btn_manual.setChecked(True)
+                self._toggle_manual(True)
+            self.txt_cmd.setText(dlg.selected_cmd)
+
     def _browse(self):
         if self.rb_folder.isChecked():
             path = QFileDialog.getExistingDirectory(self, "Seleziona cartella")
@@ -2306,6 +3074,8 @@ class MainWindow(QMainWindow):
             "img_fmt":      img_fmt,
             "img_quality":  img_quality,
             "verbose_log":  getattr(self, "chk_verbose", QCheckBox()).isChecked(),
+            "auto_settings": dict(getattr(self, "_auto_settings", {})),
+            "is_folder":    self.rb_folder.isChecked(),
         }
     def _unique_path(self, dst):
         if not os.path.exists(dst): return dst
