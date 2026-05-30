@@ -25,19 +25,58 @@ import json
 import subprocess
 import shutil
 from pathlib import Path
+
+
+import ctypes
+
+def _carica_librerie_cuda():
+    home = str(Path.home())
+
+    if sys.platform.startswith("win32"):
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+        if hasattr(os, 'add_dll_directory'):
+            try:
+                os.add_dll_directory(base_path)
+            except Exception:
+                pass
+        os.environ["PATH"] = base_path + os.pathsep + os.environ.get("PATH", "")
+
+    elif sys.platform.startswith("linux"):
+        cublas_path = f"{home}/.local/lib/python3.14/site-packages/nvidia/cublas/lib"
+        cudnn_path = f"{home}/.local/lib/python3.14/site-packages/nvidia/cudnn/lib"
+
+        current_ld = os.environ.get("LD_LIBRARY_PATH", "")
+        os.environ["LD_LIBRARY_PATH"] = f"{cublas_path}:{cudnn_path}:{current_ld}"
+
+        for path in [cublas_path, cudnn_path]:
+            if os.path.exists(path):
+                for file in os.listdir(path):
+                    if file.startswith("libcublas.so") or file.startswith("libcudnn.so"):
+                        try:
+                            ctypes.CDLL(os.path.join(path, file))
+                        except Exception:
+                            pass
+
+_carica_librerie_cuda()
+try:
+    from faster_whisper import WhisperModel
+    WHISPER_AVAILABLE = True
+except ImportError:
+    WHISPER_AVAILABLE = False
+# =====================================================================
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QButtonGroup, QRadioButton, QComboBox,
     QLineEdit, QFileDialog, QPlainTextEdit, QProgressBar,
     QFrame, QScrollArea, QMessageBox, QGroupBox, QCheckBox,
     QDialog, QDialogButtonBox, QTextEdit, QSlider, QSizePolicy,
-    QColorDialog, QGridLayout
+    QColorDialog, QGridLayout, QFormLayout, QListWidget
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont, QTextCursor
 
 def _find_tool(name: str) -> str:
-
     exe = name + (".exe" if sys.platform == "win32" else "")
 
     # 1. Bundle PyInstaller (sys._MEIPASS esiste solo dentro l'exe)
@@ -52,13 +91,22 @@ def _find_tool(name: str) -> str:
         if os.path.isfile(candidate):
             return candidate
 
-    # 3. PATH di sistema
+    # 3. Stessa cartella dello script .py
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    candidate = os.path.join(script_dir, exe)
+    if os.path.isfile(candidate):
+        return candidate
+
+    # 4. PATH di sistema
     found = shutil.which(name)
     if found:
         return found
 
     # Fallback – subprocess solleverà un errore leggibile
     return exe
+
+# Cartella dello script — usata anche per cercare realesrgan
+SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
 
 FFMPEG_BIN  = _find_tool("ffmpeg")
 FFPROBE_BIN = _find_tool("ffprobe")
@@ -961,6 +1009,127 @@ TRANSLATIONS = {
         "de": "🔒  Zurück zum automatischen Modus", "es": "🔒  Volver al modo automático",
         "doge": "🔒  no touch. auto now. wow",
     },
+    # ── Dialog Sottotitoli ────────────────────────────────────
+    "btn_subtitles": {
+        "it": "🎙  Sottotitoli…", "en": "🎙  Subtitles…",
+        "de": "🎙  Untertitel…", "es": "🎙  Subtítulos…",
+        "doge": "🎙  sub wow",
+    },
+    "dlg_sub_title": {
+        "it": "Generazione sottotitoli automatica",
+        "en": "Automatic subtitle generation",
+        "de": "Automatische Untertitel-Generierung",
+        "es": "Generación automática de subtítulos",
+        "doge": "auto sub wow",
+    },
+    "grp_sub_engine": {
+        "it": "Motore di riconoscimento vocale",
+        "en": "Speech recognition engine",
+        "de": "Spracherkennungs-Engine",
+        "es": "Motor de reconocimiento de voz",
+        "doge": "voice brain engine",
+    },
+    "lbl_sub_model": {
+        "it": "Modello Whisper:", "en": "Whisper model:",
+        "de": "Whisper-Modell:", "es": "Modelo Whisper:",
+        "doge": "which whisper?:",
+    },
+    "lbl_sub_device": {
+        "it": "Esegui su:", "en": "Run on:",
+        "de": "Ausführen auf:", "es": "Ejecutar en:",
+        "doge": "run where?:",
+    },
+    "lbl_sub_lang": {
+        "it": "Lingua audio:", "en": "Audio language:",
+        "de": "Audiosprache:", "es": "Idioma del audio:",
+        "doge": "what language?:",
+    },
+    "grp_sub_output": {
+        "it": "Modalità output", "en": "Output mode",
+        "de": "Ausgabemodus", "es": "Modo de salida",
+        "doge": "output mode wow",
+    },
+    "rb_sub_soft": {
+        "it": "Morbidi — traccia separata nel container (attivabili/disattivabili dal player)",
+        "en": "Soft — separate track in container (can be toggled in player)",
+        "de": "Weich — separate Spur im Container (im Player ein/ausschaltbar)",
+        "es": "Suaves — pista separada en el container (activables en el reproductor)",
+        "doge": "soft sub. player toggle. wow.",
+    },
+    "rb_sub_hard": {
+        "it": "Hard — bruciati nel video (sempre visibili, non disattivabili)",
+        "en": "Hard — burned into video (always visible, cannot be disabled)",
+        "de": "Hard — ins Video gebrannt (immer sichtbar, nicht deaktivierbar)",
+        "es": "Hard — grabados en el video (siempre visibles, no desactivables)",
+        "doge": "hard burn. no turn off. always there. wow.",
+    },
+    "rb_sub_srt_only": {
+        "it": "Solo SRT — genera solo il file sottotitoli, non tocca il video",
+        "en": "SRT only — generates only the subtitle file, does not modify the video",
+        "de": "Nur SRT — erzeugt nur die Untertiteldatei, Video bleibt unverändert",
+        "es": "Solo SRT — genera solo el archivo de subtítulos, no modifica el video",
+        "doge": "just srt file. video untouched. wow.",
+    },
+    "lbl_sub_hard_warn": {
+        "it": "⚠  I sottotitoli hard sono bruciati nei frame del video e richiedono una ricodifica completa.\nNon potranno essere rimossi o disattivati in alcun modo.",
+        "en": "⚠  Hard subtitles are burned into the video frames and require full re-encoding.\nThey cannot be removed or disabled in any way.",
+        "de": "⚠  Harte Untertitel werden in die Videoframes gebrannt und erfordern eine vollständige Neukodierung.\nSie können auf keine Weise entfernt oder deaktiviert werden.",
+        "es": "⚠  Los subtítulos hard se graban en los fotogramas y requieren recodificación completa.\nNo se pueden eliminar ni desactivar de ninguna manera.",
+        "doge": "⚠  burned forever. no remove. much permanent. wow.",
+    },
+    "grp_sub_style": {
+        "it": "Stile testo (solo Hard)", "en": "Text style (Hard only)",
+        "de": "Textstil (nur Hard)", "es": "Estilo de texto (solo Hard)",
+        "doge": "style only hard wow",
+    },
+    "lbl_sub_fontsize": {
+        "it": "Dimensione font:", "en": "Font size:",
+        "de": "Schriftgröße:", "es": "Tamaño de fuente:",
+        "doge": "how big text?:",
+    },
+    "lbl_sub_color": {
+        "it": "Colore testo:", "en": "Text color:",
+        "de": "Textfarbe:", "es": "Color de texto:",
+        "doge": "what color?:",
+    },
+    "lbl_sub_position": {
+        "it": "Posizione:", "en": "Position:",
+        "de": "Position:", "es": "Posición:",
+        "doge": "where subs?:",
+    },
+    "sub_not_installed_title": {
+        "it": "faster-whisper non trovato",
+        "en": "faster-whisper not found",
+        "de": "faster-whisper nicht gefunden",
+        "es": "faster-whisper no encontrado",
+        "doge": "whisper missing wow",
+    },
+    "sub_not_installed_body": {
+        "it": "La libreria faster-whisper non è installata.\n\nPer installarla esegui nel terminale:\n\n    pip install faster-whisper\n\nSe hai una GPU NVIDIA assicurati di avere CUDA 12 installato per la modalità GPU.",
+        "en": "The faster-whisper library is not installed.\n\nTo install it, run in the terminal:\n\n    pip install faster-whisper\n\nIf you have an NVIDIA GPU, make sure CUDA 12 is installed for GPU mode.",
+        "de": "Die faster-whisper-Bibliothek ist nicht installiert.\n\nZur Installation im Terminal ausführen:\n\n    pip install faster-whisper\n\nBei einer NVIDIA GPU sicherstellen, dass CUDA 12 für den GPU-Modus installiert ist.",
+        "es": "La librería faster-whisper no está instalada.\n\nPara instalarla ejecuta en la terminal:\n\n    pip install faster-whisper\n\nSi tienes una GPU NVIDIA asegúrate de tener CUDA 12 instalado para el modo GPU.",
+        "doge": "no faster-whisper. pip install it. much easy. wow.",
+    },
+    "btn_sub_confirm": {
+        "it": "✔  Attiva sottotitoli", "en": "✔  Enable subtitles",
+        "de": "✔  Untertitel aktivieren", "es": "✔  Activar subtítulos",
+        "doge": "✔  subs on wow",
+    },
+    "btn_sub_disable": {
+        "it": "✖  Disattiva sottotitoli", "en": "✖  Disable subtitles",
+        "de": "✖  Untertitel deaktivieren", "es": "✖  Desactivar subtítulos",
+        "doge": "✖  subs off wow",
+    },
+    "btn_sub_cancel": {
+        "it": "Annulla", "en": "Cancel", "de": "Abbrechen", "es": "Cancelar",
+        "doge": "nope",
+    },
+    "lbl_sub_active": {
+        "it": "🎙 sottotitoli attivi", "en": "🎙 subtitles active",
+        "de": "🎙 Untertitel aktiv", "es": "🎙 subtítulos activos",
+        "doge": "🎙 subs on wow",
+    },
     # ── Dialog AUTO avanzato ──────────────────────────────────
     "dlg_auto_title": {
         "it": "Impostazioni modalità AUTO",
@@ -1390,6 +1559,7 @@ TRANSLATIONS = {
         "it": "Mantieni originale", "en": "Keep original", "de": "Original beibehalten",
         "es": "Mantener original", "doge": "keep as is wow",
     },
+
 }
 
 # Active language code
@@ -1827,6 +1997,10 @@ class LicenseDialog(QDialog):
 # ============================================================
 PRESETS_KEY = "ffmpeg_presets"  # chiave nel config JSON
 
+
+
+
+
 def load_ffmpeg_presets() -> dict:
     """Restituisce il dizionario {nome: comando} dei preset salvati."""
     try:
@@ -1863,6 +2037,211 @@ def delete_ffmpeg_preset(name: str):
             json.dump(cfg, f, indent=2)
     except Exception:
         pass
+
+# ============================================================
+#  DIALOG SOTTOTITOLI
+# ============================================================
+WHISPER_MODELS = [
+    ("tiny",     "Tiny   — ~39 MB  | velocissimo, meno preciso"),
+    ("base",     "Base   — ~74 MB  | veloce, buona precisione"),
+    ("small",    "Small  — ~244 MB | bilanciato  ✓ raccomandato"),
+    ("medium",   "Medium — ~769 MB | preciso, più lento"),
+    ("large-v3", "Large v3 — ~1.5 GB | massima precisione, richiede GPU"),
+]
+WHISPER_LANGUAGES = [
+    ("auto",  "🌐 Auto-detect"),
+    ("it",    "🇮🇹 Italiano"),
+    ("en",    "🇬🇧 English"),
+    ("de",    "🇩🇪 Deutsch"),
+    ("es",    "🇪🇸 Español"),
+    ("ja",    "🇯🇵 日本語"),
+    ("zh",    "🇨🇳 中文"),
+    ("pt",    "🇵🇹 Português"),
+    ("ru",    "🇷🇺 Русский"),
+    ("ar",    "🇸🇦 العربية"),
+    ("ko",    "🇰🇷 한국어"),
+]
+SUB_COLORS = ["white", "yellow", "#00ffff", "#ff6666", "black"]
+SUB_POSITIONS = ["bottom", "top"]
+
+def check_faster_whisper() -> bool:
+    """Ritorna True se faster-whisper è importabile."""
+    try:
+        import importlib
+        return importlib.util.find_spec("faster_whisper") is not None
+    except Exception:
+        return False
+
+
+class SubtitleDialog(QDialog):
+    """
+    Dialog per configurare la generazione automatica di sottotitoli
+    tramite faster-whisper. Si apre dal pulsante 🎙 Sottotitoli…
+    """
+    def __init__(self, current: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(T("dlg_sub_title"))
+        self.resize(560, 520)
+        self._whisper_ok = check_faster_whisper()
+
+        lay = QVBoxLayout(self)
+        lay.setSpacing(10)
+
+        # ── Banner "non installato" ────────────────────────────
+        self.frm_missing = QFrame()
+        self.frm_missing.setStyleSheet(
+            "background:#2a1500; border:1px solid #cc5500;"
+            "border-radius:8px; padding:10px;")
+        ml = QVBoxLayout(self.frm_missing)
+        lbl_miss_title = QLabel(T("sub_not_installed_title"))
+        lbl_miss_title.setStyleSheet("color:#ff8800; font-weight:bold; font-size:13px;")
+        ml.addWidget(lbl_miss_title)
+        lbl_miss_body = QLabel(T("sub_not_installed_body"))
+        lbl_miss_body.setWordWrap(True)
+        lbl_miss_body.setStyleSheet("color:#ffbb66; font-family:monospace; font-size:11px;")
+        ml.addWidget(lbl_miss_body)
+        lay.addWidget(self.frm_missing)
+        self.frm_missing.setVisible(not self._whisper_ok)
+
+        # ── Engine ─────────────────────────────────────────────
+        grp_engine = QGroupBox(T("grp_sub_engine"))
+        ely = QFormLayout(grp_engine)
+        ely.setSpacing(8)
+
+        self.cmb_model = QComboBox()
+        for code, label in WHISPER_MODELS:
+            self.cmb_model.addItem(label, code)
+        saved_model = current.get("model", "small")
+        for i in range(self.cmb_model.count()):
+            if self.cmb_model.itemData(i) == saved_model:
+                self.cmb_model.setCurrentIndex(i)
+                break
+        ely.addRow(T("lbl_sub_model"), self.cmb_model)
+
+        self.cmb_device = QComboBox()
+        self.cmb_device.addItems(["auto", "cpu", "cuda"])
+        self.cmb_device.setCurrentText(current.get("device", "auto"))
+        ely.addRow(T("lbl_sub_device"), self.cmb_device)
+
+        self.cmb_lang = QComboBox()
+        for code, label in WHISPER_LANGUAGES:
+            self.cmb_lang.addItem(label, code)
+        saved_lang = current.get("language", "auto")
+        for i in range(self.cmb_lang.count()):
+            if self.cmb_lang.itemData(i) == saved_lang:
+                self.cmb_lang.setCurrentIndex(i)
+                break
+        ely.addRow(T("lbl_sub_lang"), self.cmb_lang)
+
+        lay.addWidget(grp_engine)
+
+        # ── Output mode ────────────────────────────────────────
+        grp_out = QGroupBox(T("grp_sub_output"))
+        oly = QVBoxLayout(grp_out)
+        self.bg_out = QButtonGroup(self)
+        self.rb_soft     = QRadioButton(T("rb_sub_soft"))
+        self.rb_hard     = QRadioButton(T("rb_sub_hard"))
+        self.rb_srt_only = QRadioButton(T("rb_sub_srt_only"))
+        self.bg_out.addButton(self.rb_soft,     0)
+        self.bg_out.addButton(self.rb_hard,     1)
+        self.bg_out.addButton(self.rb_srt_only, 2)
+        # blocca i segnali PRIMA di setChecked per evitare
+        # che buttonClicked sparino prima che grp_style esista
+        self.bg_out.blockSignals(True)
+        out_mode = current.get("out_mode", "soft")
+        if out_mode == "hard":    self.rb_hard.setChecked(True)
+        elif out_mode == "srt":   self.rb_srt_only.setChecked(True)
+        else:                     self.rb_soft.setChecked(True)
+        self.bg_out.blockSignals(False)
+        oly.addWidget(self.rb_soft)
+        oly.addWidget(self.rb_hard)
+        oly.addWidget(self.rb_srt_only)
+
+        self.lbl_hard_warn = QLabel(T("lbl_sub_hard_warn"))
+        self.lbl_hard_warn.setWordWrap(True)
+        self.lbl_hard_warn.setStyleSheet(
+            "color:#cc8800; font-size:11px; font-style:italic;"
+            "background:#1a1000; border:1px solid #cc8800;"
+            "border-radius:6px; padding:6px; margin-left:22px;")
+        oly.addWidget(self.lbl_hard_warn)
+        lay.addWidget(grp_out)
+
+        # ── Stile hard ─────────────────────────────────────────
+        self.grp_style = QGroupBox(T("grp_sub_style"))
+        sly = QFormLayout(self.grp_style)
+        sly.setSpacing(6)
+
+        self.spin_fontsize = QLineEdit(str(current.get("fontsize", 22)))
+        self.spin_fontsize.setFixedWidth(60)
+        sly.addRow(T("lbl_sub_fontsize"), self.spin_fontsize)
+
+        self.cmb_color = QComboBox()
+        self.cmb_color.addItems(SUB_COLORS)
+        self.cmb_color.setCurrentText(current.get("color", "white"))
+        sly.addRow(T("lbl_sub_color"), self.cmb_color)
+
+        self.cmb_pos = QComboBox()
+        self.cmb_pos.addItems(SUB_POSITIONS)
+        self.cmb_pos.setCurrentText(current.get("position", "bottom"))
+        sly.addRow(T("lbl_sub_position"), self.cmb_pos)
+
+        lay.addWidget(self.grp_style)
+
+        # ── Bottoni ────────────────────────────────────────────
+        btn_row = QHBoxLayout()
+        self.btn_confirm = QPushButton(T("btn_sub_confirm"))
+        self.btn_confirm.setObjectName("btn_primary")
+        self.btn_confirm.clicked.connect(self.accept)
+        self.btn_confirm.setEnabled(self._whisper_ok)
+        btn_disable = QPushButton(T("btn_sub_disable"))
+        btn_disable.setObjectName("btn_danger")
+        btn_disable.clicked.connect(self._disable)
+        btn_cancel = QPushButton(T("btn_sub_cancel"))
+        btn_cancel.clicked.connect(self.reject)
+        btn_row.addWidget(self.btn_confirm)
+        btn_row.addWidget(btn_disable)
+        btn_row.addStretch()
+        btn_row.addWidget(btn_cancel)
+        lay.addLayout(btn_row)
+
+        self.disabled = False
+        # collega il segnale SOLO DOPO che grp_style è stato costruito
+        self.bg_out.buttonClicked.connect(self._update_style_visibility)
+        # aggiorna visibilità stato iniziale senza emettere segnali
+        self._update_style_visibility()
+
+        # disabilita tutto se whisper mancante tranne il banner
+        if not self._whisper_ok:
+            grp_engine.setEnabled(False)
+            grp_out.setEnabled(False)
+            self.grp_style.setEnabled(False)
+
+    def _disable(self):
+        self.disabled = True
+        self.accept()
+
+    def _update_style_visibility(self):
+        is_hard = self.rb_hard.isChecked()
+        self.lbl_hard_warn.setVisible(is_hard)
+        self.grp_style.setVisible(is_hard)
+        self.adjustSize()
+
+    def get_settings(self) -> dict:
+        return {
+            "enabled":  True,
+            "model":    self.cmb_model.currentData(),
+            "device":   self.cmb_device.currentText(),
+            "language": self.cmb_lang.currentData(),
+            "out_mode": (
+                "hard"  if self.rb_hard.isChecked() else
+                "srt"   if self.rb_srt_only.isChecked() else
+                "soft"
+            ),
+            "fontsize": int(self.spin_fontsize.text() or "22"),
+            "color":    self.cmb_color.currentText(),
+            "position": self.cmb_pos.currentText(),
+        }
+
 
 # ============================================================
 #  DIALOG IMPOSTAZIONI AUTO
@@ -2181,6 +2560,198 @@ class FfmpegPresetLoadDialog(QDialog):
             QMessageBox.warning(self, T("dlg_warn_title"), T("dlg_preset_import_err"))
 
 # ============================================================
+#  THREAD SOTTOTITOLI
+# ============================================================
+class SubtitleThread(QThread):
+    """
+    Genera sottotitoli per un singolo file video usando faster-whisper,
+    poi li integra nel video (soft/hard) o li salva come SRT.
+    Emette log_line per il terminale e finished(bool, str) al termine.
+    """
+    log_line = pyqtSignal(str)
+    finished = pyqtSignal(bool, str)  # success, dst_path
+
+    def __init__(self, src: str, dst: str, settings: dict):
+        super().__init__()
+        self.src      = src
+        self.dst      = dst
+        self.settings = settings
+        self._stop    = False
+
+    def stop(self):
+        self._stop = True
+
+    def run(self):
+        import tempfile, shutil
+        src      = self.src
+        dst      = self.dst
+        cfg      = self.settings
+        model_id = cfg.get("model", "small")
+        device   = cfg.get("device", "auto")
+        language = cfg.get("language", "auto") or None
+        if language == "auto":
+            language = None
+        out_mode = cfg.get("out_mode", "soft")
+
+        srt_path = str(Path(dst).with_suffix(".srt"))
+        self.log_line.emit("\n" + "─"*50)
+        self.log_line.emit(f"[SUB] {os.path.basename(src)}")
+        self.log_line.emit(f"  modello={model_id}  device={device}  lingua={language or 'auto'}")
+
+        # ── Step 1: trascrizione ──────────────────────────────
+        try:
+            from faster_whisper import WhisperModel
+        except ImportError:
+            self.log_line.emit("  ✗ faster-whisper non installato — pip install faster-whisper")
+            self.finished.emit(False, "")
+            return
+
+        # auto device: prova cuda, cade su cpu
+        if device == "auto":
+            import importlib
+            try:
+                import torch
+                actual_device = "cuda" if torch.cuda.is_available() else "cpu"
+            except Exception:
+                actual_device = "cpu"
+        else:
+            actual_device = device
+
+        compute_type = "float16" if actual_device == "cuda" else "int8"
+        self.log_line.emit(f"  carico modello {model_id} su {actual_device} ({compute_type})…")
+
+        try:
+            model = WhisperModel(model_id, device=actual_device, compute_type=compute_type)
+        except Exception as e:
+            self.log_line.emit(f"  ✗ errore caricamento modello: {e}")
+            self.finished.emit(False, "")
+            return
+
+        self.log_line.emit("  trascrizione in corso…")
+        try:
+            segments, info = model.transcribe(
+                src,
+                language=language,
+                beam_size=5,
+                vad_filter=True,
+            )
+            seg_list = list(segments)
+        except Exception as e:
+            self.log_line.emit(f"  ✗ errore trascrizione: {e}")
+            self.finished.emit(False, "")
+            return
+
+        if not seg_list:
+            self.log_line.emit("  ✗ nessun segmento rilevato — audio assente o silenzio")
+            self.finished.emit(False, "")
+            return
+
+        self.log_line.emit(f"  lingua rilevata: {info.language}  ({len(seg_list)} segmenti)")
+
+        # ── Step 2: scrittura SRT ────────────────────────────
+        def fmt_ts(s):
+            h  = int(s // 3600)
+            m  = int((s % 3600) // 60)
+            se = int(s % 60)
+            ms = int((s - int(s)) * 1000)
+            return f"{h:02}:{m:02}:{se:02},{ms:03}"
+
+        try:
+            with open(srt_path, "w", encoding="utf-8") as f:
+                for i, seg in enumerate(seg_list, 1):
+                    f.write(f"{i}\n{fmt_ts(seg.start)} --> {fmt_ts(seg.end)}\n{seg.text.strip()}\n\n")
+            self.log_line.emit(f"  SRT salvato: {srt_path}")
+        except Exception as e:
+            self.log_line.emit(f"  ✗ errore scrittura SRT: {e}")
+            self.finished.emit(False, "")
+            return
+
+        if self._stop:
+            self.finished.emit(False, "")
+            return
+
+        if out_mode == "srt":
+            self.log_line.emit("  ✓ Solo SRT — video non modificato")
+            self.finished.emit(True, srt_path)
+            return
+
+        # ── Step 3: integrazione nel video ────────────────────
+        os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
+
+        if out_mode == "soft":
+            # copia stream + aggiungi traccia SRT — nessuna ricodifica
+            ext = Path(dst).suffix.lower()
+            codec_sub = "mov_text" if ext == ".mp4" else "srt"
+            cmd = [
+                FFMPEG_BIN, "-i", src, "-i", srt_path,
+                "-c", "copy", f"-c:s", codec_sub,
+                "-metadata:s:s:0", f"language={info.language}",
+                dst, "-y"
+            ]
+            self.log_line.emit("  modalità SOFT — copia stream + traccia SRT")
+        else:
+            # hard burn-in: richiede ricodifica video
+            fontsize = cfg.get("fontsize", 22)
+            color    = cfg.get("color", "white")
+            position = cfg.get("position", "bottom")
+            # converte colore CSS → ASS (&HAABBGGRR)
+            color_map = {
+                "white":   "&H00FFFFFF",
+                "yellow":  "&H0000FFFF",
+                "#00ffff": "&H00FFFF00",
+                "#ff6666": "&H006666FF",
+                "black":   "&H00000000",
+            }
+            ass_color  = color_map.get(color, "&H00FFFFFF")
+            vmargin    = 20
+            valign     = 2 if position == "bottom" else 6  # 2=bottom, 6=top in ASS
+            force_style = (
+                f"FontSize={fontsize},PrimaryColour={ass_color},"
+                f"Alignment={valign},MarginV={vmargin},BorderStyle=1,Outline=1,Shadow=0"
+            )
+            # escape percorso per ffmpeg subtitles filter (windows compat)
+            srt_escaped = srt_path.replace("\\", "/").replace(":", "\\:")
+            cmd = [
+                FFMPEG_BIN, "-i", src,
+                "-vf", f"subtitles='{srt_escaped}':force_style='{force_style}'",
+                "-c:a", "copy",
+                dst, "-y"
+            ]
+            self.log_line.emit(f"  modalità HARD — burn-in font={fontsize} colore={color} pos={position}")
+
+        self.log_line.emit("  $ " + " ".join(cmd))
+        try:
+            proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1
+            )
+            for line in proc.stdout:
+                if self._stop:
+                    proc.terminate()
+                    break
+                line = line.rstrip()
+                if line.strip() and not any(line.startswith(p) for p in
+                        ["frame=","fps=","stream_","bitrate=","speed=",
+                         "out_time","total_size","dup_frames","drop_frames","progress="]):
+                    self.log_line.emit("  " + line)
+            proc.wait()
+            success = proc.returncode == 0 and os.path.exists(dst) and os.path.getsize(dst) > 0
+        except Exception as e:
+            self.log_line.emit(f"  ✗ errore ffmpeg: {e}")
+            success = False
+
+        if success:
+            self.log_line.emit(f"  ✓ OK → {dst}")
+        else:
+            self.log_line.emit("  ✗ ERRORE integrazione sottotitoli")
+            if os.path.exists(dst):
+                try: os.remove(dst)
+                except Exception: pass
+
+        self.finished.emit(success, dst if success else "")
+
+
+# ============================================================
 #  THREAD DI CONVERSIONE
 # ============================================================
 class ConvertThread(QThread):
@@ -2264,7 +2835,178 @@ class ConvertThread(QThread):
                 cmd += ["-vf", scale_filter]
             cmd += video_opts + audio_opts + sr_flag + [dst, "-y", "-progress", "pipe:1"]
         return cmd
-    def get_duration(self, src):
+
+    def build_ai_upscale_cmd(self, frames_in_dir: str, frames_out_dir: str,
+                              model_path: str) -> list:
+        """
+        Costruisce il comando realesrgan-ncnn-vulkan per upscalare
+        i frame estratti da frames_in_dir a frames_out_dir usando model_path.
+        Il modello viene passato senza estensione (param+bin nella stessa cartella).
+        """
+        model_dir  = str(Path(model_path).parent)
+        model_name = Path(model_path).stem
+        # rimuovi suffisso .param se presente (realesrgan vuole il nome senza estensione)
+        if model_name.endswith(".param"):
+            model_name = model_name[:-6]
+        cmd = [
+            REALESRGAN_BIN,
+            "-i", frames_in_dir,
+            "-o", frames_out_dir,
+            "-m", model_dir,
+            "-n", model_name,
+            "-f", "png",
+        ]
+        return cmd
+
+    def run_ai_upscale(self, src: str, dst: str, src_info: dict,
+                       src_file_bytes: int = 0, duration_s: float = 0.0) -> bool:
+        """
+        Esegue upscaling AI su un file video usando realesrgan-ncnn-vulkan.
+        Pipeline:
+          1. Estrae i frame dal video sorgente (ffmpeg → PNG)
+          2. Upscala i frame con realesrgan-ncnn-vulkan
+          3. Riassembla il video upscalato con audio originale (ffmpeg)
+        Ritorna True se successo.
+        """
+        import tempfile, shutil as _shutil
+
+        model_path = self.params.get("ai_model_path", "")
+        res_key    = self.params.get("resolution", "Mantieni originale")
+        dst_w, dst_h = self.get_dst_dims(src_info, res_key)
+
+        # Cartelle temporanee
+        tmp_root     = tempfile.mkdtemp(prefix="disagio_ai_")
+        frames_in    = os.path.join(tmp_root, "frames_in")
+        frames_out   = os.path.join(tmp_root, "frames_out")
+        os.makedirs(frames_in,  exist_ok=True)
+        os.makedirs(frames_out, exist_ok=True)
+
+        try:
+            # ── Step 1: estrai frame ──────────────────────────
+            self.log_line.emit("  [AI] Estrazione frame...")
+            fps = src_info.get("fps", 25.0)
+            cmd_extract = [
+                FFMPEG_BIN, "-i", src,
+                "-vf", f"scale={src_info['width']}:{src_info['height']}",
+                "-q:v", "1",
+                os.path.join(frames_in, "frame_%08d.png"), "-y"
+            ]
+            self.log_line.emit("  $ " + " ".join(cmd_extract))
+            r = subprocess.run(cmd_extract, capture_output=True, text=True, timeout=3600)
+            if r.returncode != 0:
+                self.log_line.emit(f"  ✗ Estrazione frame fallita: {r.stderr[-400:]}")
+                return False
+
+            n_frames = len([f for f in os.listdir(frames_in) if f.endswith(".png")])
+            self.log_line.emit(f"  [AI] {n_frames} frame estratti")
+
+            if self._stop:
+                return False
+
+            # ── Step 2: upscaling con realesrgan ─────────────
+            self.log_line.emit(f"  [AI] Upscaling con modello: {os.path.basename(model_path)}")
+            cmd_upscale = self.build_ai_upscale_cmd(frames_in, frames_out, model_path)
+            self.log_line.emit("  $ " + " ".join(cmd_upscale))
+            proc_up = subprocess.Popen(
+                cmd_upscale, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1
+            )
+            done_count = 0
+            for line in proc_up.stdout:
+                if self._stop:
+                    proc_up.terminate()
+                    return False
+                line = line.rstrip()
+                if line:
+                    self.log_line.emit("  " + line)
+                    # prova a stimare progresso da output di realesrgan
+                    if "/" in line:
+                        try:
+                            parts = [p.strip() for p in line.split("/")]
+                            done_count = int(parts[0].split()[-1])
+                            total = int(parts[1].split()[0])
+                            if n_frames > 0:
+                                pct = int(done_count / n_frames * 80)  # 0-80%
+                                self.progress.emit(pct)
+                        except Exception:
+                            pass
+            proc_up.wait()
+            if proc_up.returncode != 0:
+                self.log_line.emit("  ✗ Upscaling AI fallito")
+                return False
+
+            n_out = len([f for f in os.listdir(frames_out) if f.endswith(".png")])
+            self.log_line.emit(f"  [AI] {n_out} frame upscalati")
+
+            if self._stop:
+                return False
+
+            # ── Step 3: riassembla video ─────────────────────
+            self.log_line.emit("  [AI] Riassemblaggio video...")
+            sample   = self.params.get("sample_rate", "Mantieni originale")
+            sample_internal = sr_internal_key(sample)
+            sr_flag  = [] if sample_internal == "Mantieni originale" else ["-ar", sample_internal.replace(" Hz", "")]
+            audio_opts = self.params["audio_preset"].split()
+
+            video_opts = self.get_video_opts(
+                src_info, dst_w, dst_h,
+                src_file=src, src_file_bytes=src_file_bytes, duration_s=duration_s
+            ).split()
+
+            # forza scala finale nel caso il modello non abbia upscalato esattamente alle dim target
+            scale_filter = f"scale={dst_w}:{dst_h}:flags=lanczos:force_original_aspect_ratio=decrease,pad={dst_w}:{dst_h}:(ow-iw)/2:(oh-ih)/2"
+
+            cmd_assemble = [
+                FFMPEG_BIN,
+                "-framerate", str(round(fps)),
+                "-i", os.path.join(frames_out, "frame_%08d.png"),
+                "-i", src,       # audio originale
+                "-map", "0:v",   # video dai frame upscalati
+                "-map", "1:a?",  # audio dalla sorgente
+                "-vf", scale_filter,
+            ] + video_opts + audio_opts + sr_flag + [
+                "-shortest",
+                dst, "-y", "-progress", "pipe:1"
+            ]
+
+            self.log_line.emit("  $ " + " ".join(cmd_assemble))
+            proc_asm = subprocess.Popen(
+                cmd_assemble, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1
+            )
+            for line in proc_asm.stdout:
+                if self._stop:
+                    proc_asm.terminate()
+                    return False
+                line = line.rstrip()
+                if line.startswith("out_time_ms="):
+                    try:
+                        ms = int(line.split("=")[1])
+                        t  = ms / 1_000_000
+                        if duration_s > 0:
+                            pct = 80 + min(int(t / duration_s * 20), 19)
+                            self.progress.emit(pct)
+                    except Exception:
+                        pass
+                elif line.strip() and not any(line.startswith(p) for p in
+                        ["frame=","fps=","stream_","bitrate=","speed=",
+                         "out_time","total_size","dup_frames","drop_frames","progress="]):
+                    self.log_line.emit("  " + line)
+            proc_asm.wait()
+            success = (proc_asm.returncode == 0
+                       and os.path.exists(dst) and os.path.getsize(dst) > 0)
+            if not success:
+                self.log_line.emit("  ✗ Riassemblaggio video fallito")
+            return success
+
+        finally:
+            # Pulizia cartelle temporanee
+            try:
+                _shutil.rmtree(tmp_root, ignore_errors=True)
+            except Exception:
+                pass
+
+
         try:
             r = subprocess.run(
                 [FFPROBE_BIN, "-v", "quiet", "-show_entries", "format=duration",
@@ -2321,48 +3063,65 @@ class ConvertThread(QThread):
                                                src_file_bytes=src_file_bytes,
                                                duration_s=duration)
                 self.log_line.emit(f"  [AUTO] {computed}")
-            cmd = self.build_cmd(src, dst, src_info,
-                                 src_file_bytes=src_file_bytes,
-                                 duration_s=duration)
-            self.log_line.emit("  $ " + " ".join(cmd))
-            try:
-                proc = subprocess.Popen(
-                    cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    text=True, bufsize=1
-                )
-                for line in proc.stdout:
-                    if self._stop:
-                        proc.terminate(); break
-                    line = line.rstrip()
-                    if line.startswith("out_time_ms="):
-                        try:
-                            ms  = int(line.split("=")[1])
-                            t   = ms / 1_000_000
-                            if duration > 0:
-                                pct = min(int(t / duration * 100), 99)
-                                self.progress.emit(int((idx + pct/100) / total * 100))
-                        except Exception:
-                            pass
-                    elif line.startswith("progress=end"):
+
+            # ── AI Upscaling pipeline ────────────────────────
+            ai_active = (self.params.get("ai_upscale", False)
+                         and self.params["mode"] == "video"
+                         and bool(self.params.get("ai_model_path", "")))
+            if ai_active:
+                self.log_line.emit("  [AI] Modalità upscaling AI attiva")
+                try:
+                    success = self.run_ai_upscale(
+                        src, dst, src_info,
+                        src_file_bytes=src_file_bytes,
+                        duration_s=duration
+                    )
+                except Exception as e:
+                    self.log_line.emit(f"  ERRORE AI upscale: {e}")
+                    success = False
+            else:
+                cmd = self.build_cmd(src, dst, src_info,
+                                     src_file_bytes=src_file_bytes,
+                                     duration_s=duration)
+                self.log_line.emit("  $ " + " ".join(cmd))
+                try:
+                    proc = subprocess.Popen(
+                        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                        text=True, bufsize=1
+                    )
+                    for line in proc.stdout:
+                        if self._stop:
+                            proc.terminate(); break
+                        line = line.rstrip()
+                        if line.startswith("out_time_ms="):
+                            try:
+                                ms  = int(line.split("=")[1])
+                                t   = ms / 1_000_000
+                                if duration > 0:
+                                    pct = min(int(t / duration * 100), 99)
+                                    self.progress.emit(int((idx + pct/100) / total * 100))
+                            except Exception:
+                                pass
+                        elif line.startswith("progress=end"):
+                            self.progress.emit(int((idx+1) / total * 100))
+                        elif line.strip():
+                            if self.verbose_log:
+                                if not line.startswith("out_time_ms=") and not line.startswith("progress="):
+                                    self.log_line.emit("  " + line)
+                            else:
+                                if not any(line.startswith(p) for p in
+                                    ["frame=","fps=","stream_","bitrate=","speed=",
+                                     "out_time","total_size","dup_frames","drop_frames", "progress="]):
+                                    self.log_line.emit("  " + line)
+                    proc.wait()
+                    # Per le immagini non si usa -progress pipe:1, quindi non arriva progress=end
+                    if self.params["mode"] == "image":
                         self.progress.emit(int((idx+1) / total * 100))
-                    elif line.strip():
-                        if self.verbose_log:
-                            if not line.startswith("out_time_ms=") and not line.startswith("progress="):
-                                self.log_line.emit("  " + line)
-                        else:
-                            if not any(line.startswith(p) for p in
-                                ["frame=","fps=","stream_","bitrate=","speed=",
-                                 "out_time","total_size","dup_frames","drop_frames", "progress="]):
-                                self.log_line.emit("  " + line)
-                proc.wait()
-                # Per le immagini non si usa -progress pipe:1, quindi non arriva progress=end
-                if self.params["mode"] == "image":
-                    self.progress.emit(int((idx+1) / total * 100))
-                success = (proc.returncode == 0 and
-                           os.path.exists(dst) and os.path.getsize(dst) > 0)
-            except Exception as e:
-                self.log_line.emit(f"  ERRORE: {e}")
-                success = False
+                    success = (proc.returncode == 0 and
+                               os.path.exists(dst) and os.path.getsize(dst) > 0)
+                except Exception as e:
+                    self.log_line.emit(f"  ERRORE: {e}")
+                    success = False
             if success:
                 ok += 1
                 self.log_line.emit("  ✓ OK")
@@ -2394,6 +3153,9 @@ class MainWindow(QMainWindow):
             "cap_value":     0.0,
             "cap_unit":      "",
         }
+        # impostazioni sottotitoli (disabled per default)
+        self._sub_settings = {"enabled": False}
+        self._sub_thread = None
         self._build_ui()
     def _build_ui(self):
         central = QWidget()
@@ -2558,11 +3320,14 @@ class MainWindow(QMainWindow):
         self.cmb_res.addItems(res_display_items())
         self.cmb_res.setCurrentText(res_display_for("Mantieni originale"))
         self.cmb_res.currentTextChanged.connect(self._update_cmd_preview)
+        self.cmb_res.currentTextChanged.connect(self._on_res_changed)
         res_row.addWidget(self.cmb_res)
         res_row.addWidget(QLabel(T("lbl_res_note")))
         res_row.addStretch()
         vlay.addLayout(res_row)
+
         self.opts_layout.addWidget(self.grp_video)
+
         # ── STEP 3 (immagini): immagini ───────────────────────
         self.grp_image = QGroupBox(T("grp_image"))
         ilay = QVBoxLayout(self.grp_image)
@@ -2613,6 +3378,7 @@ class MainWindow(QMainWindow):
         self.lbl_bmp_warn.setStyleSheet("color:#888888; font-size:11px; font-style:italic;")
         self.lbl_bmp_warn.setVisible(False)
         ilay.addWidget(self.lbl_bmp_warn)
+
         # Nota RAW (mostrata solo in modalità cartella)
         self.lbl_raw_note = QLabel(T("lbl_raw_note"))
         self.lbl_raw_note.setWordWrap(True)
@@ -2693,12 +3459,25 @@ class MainWindow(QMainWindow):
         self._on_type_changed()
         self._on_imgfmt_changed(self.cmb_imgfmt.currentText())
         # ── CONVERTI ──────────────────────────────────────────
+        go_row = QHBoxLayout()
+        self.btn_subtitles = QPushButton(T("btn_subtitles"))
+        self.btn_subtitles.setMinimumHeight(42)
+        self.btn_subtitles.setFont(QFont("monospace", 11))
+        self.btn_subtitles.clicked.connect(self._open_subtitle_settings)
+        self.lbl_sub_active = QLabel(T("lbl_sub_active"))
+        self.lbl_sub_active.setStyleSheet(
+            "color:#00ff88; font-size:11px; font-weight:bold; padding-left:8px;")
+        self.lbl_sub_active.setVisible(False)
         self.btn_go = QPushButton(T("btn_go"))
         self.btn_go.setObjectName("btn_primary")
         self.btn_go.setMinimumHeight(42)
         self.btn_go.setFont(QFont("monospace", 12, QFont.Weight.Bold))
         self.btn_go.clicked.connect(self._start)
-        root.addWidget(self.btn_go)
+        go_row.addWidget(self.btn_subtitles)
+        go_row.addWidget(self.lbl_sub_active)
+        go_row.addStretch()
+        go_row.addWidget(self.btn_go)
+        root.addLayout(go_row)
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat("%p%")
@@ -2961,6 +3740,10 @@ class MainWindow(QMainWindow):
             ext_map = {"MKV (.mkv)":"mkv","MP4 (.mp4)":"mp4","MOV (.mov)":"mov"}
             ext = ext_map.get(self.cmb_container.currentText(), "mkv")
             cmd = f"ffmpeg {hw}-i {{INPUT}}{res_str} {video_p} {audio_p} {{OUTPUT}}.{ext} -y"
+            # mostra info AI upscale nel preview
+            if hasattr(self, "chk_ai_upscale") and self.chk_ai_upscale.isChecked():
+                model_name = self.cmb_ai_model.currentText() or "—"
+                cmd = f"[AI: {model_name}]  →  {cmd}"
         if hasattr(self, "txt_cmd"):
             self.txt_cmd.setText(cmd.strip())
     def _toggle_manual(self, checked):
@@ -2970,7 +3753,7 @@ class MainWindow(QMainWindow):
             [self.rb_video, self.rb_audio, self.rb_image, self.rb_single, self.rb_folder,
              self.cmb_container, self.cmb_vcodec, self.cmb_acodec,
              self.cmb_sample, self.chk_hwaccel, self.cmb_res,
-             self.cmb_imgfmt, self.sld_imgqual]
+             self.cmb_imgfmt, self.sld_imgqual, self.cmb_ai_model, self.chk_ai_upscale]
             + list(self.bg_vqual.buttons())
             + list(self.bg_aqual.buttons())
             + list(self.bg_gpu.buttons())
@@ -2988,11 +3771,174 @@ class MainWindow(QMainWindow):
                 "background:#0d0d1a; color:#00ff88; border:1px solid #2d2d4e;"
                 "border-radius:6px; padding:6px 10px;")
             self._update_cmd_preview()
+    def _open_subtitle_settings(self):
+        try:
+            dlg = SubtitleDialog(self._sub_settings, self)
+            result = dlg.exec()
+            if result == QDialog.DialogCode.Accepted:
+                if dlg.disabled:
+                    self._sub_settings = {"enabled": False}
+                else:
+                    self._sub_settings = dlg.get_settings()
+                enabled = self._sub_settings.get("enabled", False)
+                self.lbl_sub_active.setVisible(enabled)
+                # sub compatibili solo con video
+                if enabled and hasattr(self, "rb_video") and not self.rb_video.isChecked():
+                    self.rb_video.setChecked(True)
+                    self._on_type_changed()
+        except Exception as e:
+            QMessageBox.critical(self, "Errore sottotitoli",
+                "Errore apertura dialog sottotitoli:\n" + str(e))
+
     def _open_auto_settings(self):
         is_folder = self.rb_folder.isChecked()
         dlg = AutoSettingsDialog(is_folder, self._auto_settings, self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self._auto_settings = dlg.get_settings()
+
+    def _open_auto_settings(self):
+        is_folder = self.rb_folder.isChecked()
+        dlg = AutoSettingsDialog(is_folder, self._auto_settings, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self._auto_settings = dlg.get_settings()
+
+    # ── AI Upscaling methods ──────────────────────────────────────────────
+
+    def _reload_ai_models(self):
+        """Scansiona tutte le cartelle salvate e aggiorna entrambe le ComboBox modelli."""
+        models = get_all_ai_models()
+
+        # ── aggiorna ComboBox video ───────────────────────────
+        if hasattr(self, "cmb_ai_model"):
+            self.cmb_ai_model.blockSignals(True)
+            self.cmb_ai_model.clear()
+            for m in models:
+                self.cmb_ai_model.addItem(m["display"], m)
+            self.cmb_ai_model.blockSignals(False)
+
+        # ── aggiorna ComboBox immagini ────────────────────────
+        if hasattr(self, "cmb_img_ai_model"):
+            self.cmb_img_ai_model.blockSignals(True)
+            self.cmb_img_ai_model.clear()
+            for m in models:
+                self.cmb_img_ai_model.addItem(m["display"], m)
+            self.cmb_img_ai_model.blockSignals(False)
+
+        # ── aggiorna dropdown cartelle ────────────────────────
+        if hasattr(self, "lst_ai_folders"):
+            self.lst_ai_folders.blockSignals(True)
+            self.lst_ai_folders.clear()
+            for folder in load_ai_model_folders():
+                n = len(scan_models_in_folder(folder))
+                self.lst_ai_folders.addItem(
+                    f"{os.path.basename(folder)}  ({n} modelli)  —  {folder}", folder)
+            self.lst_ai_folders.blockSignals(False)
+            has_folders = self.lst_ai_folders.count() > 0
+            if hasattr(self, "btn_ai_remove_folder"):
+                self.btn_ai_remove_folder.setEnabled(has_folders)
+
+        has_models = len(models) > 0
+        # abilita/disabilita checkbox immagini
+        if hasattr(self, "chk_img_ai_upscale"):
+            self.chk_img_ai_upscale.setEnabled(has_models)
+            if not has_models:
+                self.chk_img_ai_upscale.setChecked(False)
+        self._update_ai_upscale_state()
+
+    def _update_ai_upscale_state(self):
+        """Abilita/disabilita il checkbox AI video in base a risoluzione e modelli."""
+        if not hasattr(self, "chk_ai_upscale"):
+            return
+        res_key = (res_internal_key(self.cmb_res.currentText())
+                   if hasattr(self, "cmb_res") else "Mantieni originale")
+        has_models = hasattr(self, "cmb_ai_model") and self.cmb_ai_model.count() > 0
+        is_upscale_res = (res_key != "Mantieni originale")
+        can_enable = has_models and is_upscale_res
+        self.chk_ai_upscale.setEnabled(can_enable)
+        if not can_enable and self.chk_ai_upscale.isChecked():
+            self.chk_ai_upscale.setChecked(False)
+        show_warn = has_models and not is_upscale_res
+        self.lbl_ai_warn.setVisible(show_warn)
+        self.lbl_ai_note.setVisible(self.chk_ai_upscale.isChecked())
+
+    def _on_res_changed(self, _text):
+        self._update_ai_upscale_state()
+        self._update_cmd_preview()
+
+    def _on_ai_upscale_toggled(self, checked):
+        if hasattr(self, "cmb_ai_model"):
+            self.cmb_ai_model.setEnabled(checked)
+        self.lbl_ai_note.setVisible(checked)
+        self._update_cmd_preview()
+
+    def _on_img_ai_toggled(self, checked):
+        if hasattr(self, "cmb_img_ai_model"):
+            self.cmb_img_ai_model.setEnabled(checked)
+        if hasattr(self, "lbl_img_ai_note"):
+            self.lbl_img_ai_note.setVisible(checked)
+
+    def _ai_add_folder(self):
+        """Apre il dialog per selezionare una cartella di modelli AI."""
+        folder = QFileDialog.getExistingDirectory(
+            self, T("dlg_ai_model_title"))
+        if not folder:
+            return
+        if not add_ai_model_folder(folder):
+            QMessageBox.information(
+                self, T("dlg_warn_title"), T("ai_folder_already_added"))
+            return
+        found = scan_models_in_folder(folder)
+        if not found:
+            # cartella aggiunta ma nessun modello trovato: avvisa
+            QMessageBox.warning(
+                self, T("dlg_warn_title"), T("ai_folder_no_models"))
+        self._reload_ai_models()
+
+    def _ai_remove_folder(self):
+        """Rimuove la cartella selezionata dal dropdown."""
+        if not hasattr(self, "lst_ai_folders") or self.lst_ai_folders.count() == 0:
+            return
+        folder = self.lst_ai_folders.currentData()
+        if folder:
+            remove_ai_model_folder(folder)
+            self._reload_ai_models()
+
+    def _get_selected_ai_model(self) -> dict:
+        """Ritorna il dict del modello AI selezionato per video, o {} se nessuno."""
+        if not hasattr(self, "cmb_ai_model") or self.cmb_ai_model.count() == 0:
+            return {}
+        return self.cmb_ai_model.currentData() or {}
+
+    def _get_selected_img_ai_model(self) -> dict:
+        """Ritorna il dict del modello AI selezionato per immagini, o {} se nessuno."""
+        if not hasattr(self, "cmb_img_ai_model") or self.cmb_img_ai_model.count() == 0:
+            return {}
+        return self.cmb_img_ai_model.currentData() or {}
+
+    def _get_selected_ai_model_path(self) -> str:
+        """Costruisce il percorso completo senza estensione del modello selezionato."""
+        if self.rb_image.isChecked():
+            model = self._get_selected_img_ai_model()
+        else:
+            model = self._get_selected_ai_model()
+            
+        if not model:
+            return ""
+        return os.path.join(model["folder"], model["name"])
+
+    def _is_ai_upscale_active(self) -> bool:
+        """True se l'upscaling AI video è attivo e configurato."""
+        if not hasattr(self, "chk_ai_upscale") or not self.chk_ai_upscale.isChecked():
+            return False
+        res_key = (res_internal_key(self.cmb_res.currentText())
+                   if hasattr(self, "cmb_res") else "Mantieni originale")
+        return res_key != "Mantieni originale" and bool(self._get_selected_ai_model())
+
+    def _is_img_ai_active(self) -> bool:
+        """True se l'upscaling AI immagini è attivo e configurato."""
+        return (hasattr(self, "chk_img_ai_upscale")
+                and self.chk_img_ai_upscale.isChecked()
+                and bool(self._get_selected_img_ai_model()))
 
     def _save_ffmpeg_preset(self):
         cmd = self.txt_cmd.text().strip()
@@ -3004,6 +3950,8 @@ class MainWindow(QMainWindow):
             name = dlg.txt_name.text().strip()
             command = dlg.txt_cmd.text().strip()
             save_ffmpeg_preset(name, command)
+
+
 
     def _load_ffmpeg_preset(self):
         dlg = FfmpegPresetLoadDialog(self)
@@ -3076,6 +4024,9 @@ class MainWindow(QMainWindow):
             "verbose_log":  getattr(self, "chk_verbose", QCheckBox()).isChecked(),
             "auto_settings": dict(getattr(self, "_auto_settings", {})),
             "is_folder":    self.rb_folder.isChecked(),
+            "sub_settings":   dict(getattr(self, "_sub_settings", {})),
+            "ai_upscale":     self._is_ai_upscale_active(),
+            "ai_model_path":  self._get_selected_ai_model_path(),
         }
     def _unique_path(self, dst):
         if not os.path.exists(dst): return dst
@@ -3229,6 +4180,12 @@ class MainWindow(QMainWindow):
         self.thread.progress.connect(self.progress_bar.setValue)
         self.thread.file_done.connect(self._on_file_done)
         self.thread.all_done.connect(self._on_all_done)
+        # dopo la conversione, avvia i sottotitoli se abilitati
+        sub_cfg = params.get("sub_settings", {})
+        if sub_cfg.get("enabled") and params.get("mode") == "video":
+            self.thread.all_done.connect(
+                lambda ok, err, j=jobs, s=sub_cfg: self._start_subtitle_jobs(j, s)
+            )
         self.thread.start()
     def _stop(self):
         if self.thread:
@@ -3251,6 +4208,60 @@ class MainWindow(QMainWindow):
             f"{T('dlg_done_body_ok') if err == 0 else T('dlg_done_body_err')} {ok}"
             + (f"{T('dlg_done_errors')} {err}" if err else "")
         )
+    def _start_subtitle_jobs(self, jobs: list, sub_cfg: dict):
+        """
+        Avvia la generazione sottotitoli in sequenza dopo la conversione.
+        Per ogni job video (src, dst, ...) elabora il file DST convertito.
+        In modalità SRT-only usa il file sorgente originale.
+        """
+        out_mode = sub_cfg.get("out_mode", "soft")
+        # lista di (src_for_sub, dst_for_sub)
+        sub_jobs = []
+        for src, dst, _, is_raw in jobs:
+            if is_raw:
+                continue
+            if out_mode == "srt":
+                # genera SRT nella stessa cartella del sorgente
+                srt_dst = str(Path(src).with_suffix(".srt"))
+                sub_jobs.append((src, srt_dst))
+            else:
+                # usa il video convertito come sorgente; output con suffisso _sub
+                stem = Path(dst).stem
+                ext  = Path(dst).suffix
+                sub_dst = str(Path(dst).parent / f"{stem}_sub{ext}")
+                sub_jobs.append((dst, sub_dst))
+
+        if not sub_jobs:
+            return
+
+        self._append_log("\n" + "═"*50)
+        self._append_log(f"[SUB] Inizio generazione sottotitoli — {len(sub_jobs)} file")
+
+        self._sub_queue   = sub_jobs
+        self._sub_cfg     = sub_cfg
+        self._sub_idx     = 0
+        self._sub_ok      = 0
+        self._sub_err     = 0
+        self._run_next_subtitle()
+
+    def _run_next_subtitle(self):
+        if self._sub_idx >= len(self._sub_queue):
+            self._append_log(f"\n[SUB] Completato — \u2713{self._sub_ok}  \u2717{self._sub_err}")
+            return
+        src, dst = self._sub_queue[self._sub_idx]
+        self._sub_thread = SubtitleThread(src, dst, self._sub_cfg)
+        self._sub_thread.log_line.connect(self._append_log)
+        self._sub_thread.finished.connect(self._on_subtitle_done)
+        self._sub_thread.start()
+
+    def _on_subtitle_done(self, success: bool, dst: str):
+        if success:
+            self._sub_ok += 1
+        else:
+            self._sub_err += 1
+        self._sub_idx += 1
+        self._run_next_subtitle()
+
 # ============================================================
 #  MAIN
 # ============================================================
