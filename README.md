@@ -67,7 +67,7 @@ In conformità con la GNU General Public License v3, si dichiara quanto segue:
 
   Licenza del software: "Disagio Production Converter" è distribuito interamente sotto licenza GNU GPLv3. Il codice sorgente completo è disponibile in questo repository GitHub.
 
-  FFmpeg e ffprobe: La distribuzione compilata per Windows include i binari nativi ffmpeg.exe e ffprobe.exe (Version: 8.1.1 Full Build, scaricati non modificati da https://www.gyan.dev/ffmpeg/      builds/). FFmpeg è rilasciato sotto licenza GNU GPLv3 per via dei codec open-source commerciali inclusi (come x264, x265, ecc.), risultando al 100% compatibile con la licenza di questo progetto.
+  FFmpeg e ffprobe: La distribuzione compilata per Windows include i binari nativi ffmpeg.exe e ffprobe.exe (Full Build, scaricati non modificati da https://www.gyan.dev/ffmpeg/      builds/). FFmpeg è rilasciato sotto licenza GNU GPLv3 per via dei codec open-source commerciali inclusi (come x264, x265, ecc.), risultando al 100% compatibile con la licenza di questo progetto.
 
   Note aggiuntive: FFmpeg viene eseguito dall'applicazione come processo esterno isolato (subprocess). Nessuna modifica strutturale o software è stata apportata ai binari originali.
 
