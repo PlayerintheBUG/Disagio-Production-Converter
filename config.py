@@ -8,6 +8,7 @@ import sys
 import os
 import shutil
 import ctypes
+import glob
 from pathlib import Path
 
 def _carica_librerie_cuda():
@@ -22,9 +23,29 @@ def _carica_librerie_cuda():
                 pass
         os.environ["PATH"] = base_path + os.pathsep + os.environ.get("PATH", "")
 
+        # Cerca le DLL di nvidia-cublas-cu12 / nvidia-cudnn-cu12 installate
+        # via pip (site-packages), per abilitare faster-whisper su CUDA anche
+        # quando lo script gira "grezzo" (non da .exe compilato)
+        nvidia_dll_dirs = glob.glob(
+            os.path.join(sys.prefix, "Lib", "site-packages", "nvidia", "*", "bin")
+        )
+        nvidia_dll_dirs += glob.glob(
+            os.path.join(home, "AppData", "Roaming", "Python", "Python*",
+                         "site-packages", "nvidia", "*", "bin")
+        )
+        for dll_dir in nvidia_dll_dirs:
+            if os.path.isdir(dll_dir):
+                os.environ["PATH"] = dll_dir + os.pathsep + os.environ.get("PATH", "")
+                if hasattr(os, "add_dll_directory"):
+                    try:
+                        os.add_dll_directory(dll_dir)
+                    except Exception:
+                        pass
+
     elif sys.platform.startswith("linux"):
-        cublas_path = f"{home}/.local/lib/python3.14/site-packages/nvidia/cublas/lib"
-        cudnn_path = f"{home}/.local/lib/python3.14/site-packages/nvidia/cudnn/lib"
+        py_ver = f"python{sys.version_info.major}.{sys.version_info.minor}"
+        cublas_path = f"{home}/.local/lib/{py_ver}/site-packages/nvidia/cublas/lib"
+        cudnn_path = f"{home}/.local/lib/{py_ver}/site-packages/nvidia/cudnn/lib"
 
         current_ld = os.environ.get("LD_LIBRARY_PATH", "")
         os.environ["LD_LIBRARY_PATH"] = f"{cublas_path}:{cudnn_path}:{current_ld}"
@@ -59,6 +80,7 @@ from PyQt6.QtGui import QFont, QTextCursor
 
 def _find_tool(name: str) -> str:
     exe = name + (".exe" if sys.platform == "win32" else "")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
 
     # 1. Bundle PyInstaller (sys._MEIPASS esiste solo dentro l'exe)
     if hasattr(sys, "_MEIPASS"):
@@ -72,7 +94,19 @@ def _find_tool(name: str) -> str:
         if os.path.isfile(candidate):
             return candidate
 
-    # 3. PATH di sistema
+    # 3. Cartella dello script sorgente / sottocartelle bin (solo Windows):
+    #    utile quando si lancia il .py "grezzo" senza ffmpeg nel PATH,
+    #    mettendo ffmpeg.exe/ffprobe.exe accanto al programma
+    if sys.platform == "win32":
+        for candidate in (
+            os.path.join(script_dir, exe),
+            os.path.join(script_dir, "bin", exe),
+            os.path.join(script_dir, "ffmpeg", "bin", exe),
+        ):
+            if os.path.isfile(candidate):
+                return candidate
+
+    # 4. PATH di sistema
     found = shutil.which(name)
     if found:
         return found

@@ -47,12 +47,18 @@ from presets import (
     PRESETS_KEY, load_ffmpeg_presets, save_ffmpeg_preset, delete_ffmpeg_preset,
 )
 from video import ConvertThread
+from upscale import (
+    UpscaleThread, SCALE_FACTORS, UPSCALE_CONTAINERS,
+    UPSCALE_CODECS_BY_CONTAINER, UPSCALE_ENCODER_LABEL_KEYS,
+    UPSCALE_QUALITY_LEVELS, resolve_upscale_encoder,
+)
 from subtitle import SubtitleDialog, SubtitleThread
 from dialogs import (
     ThemeEditorDialog, LicenseDialog,
     AutoSettingsDialog,
     FfmpegPresetSaveDialog, FfmpegPresetLoadDialog,
 )
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -73,6 +79,7 @@ class MainWindow(QMainWindow):
         # impostazioni sottotitoli (disabled per default)
         self._sub_settings = {"enabled": False}
         self._sub_thread = None
+
         self._build_ui()
     def _build_ui(self):
         central = QWidget()
@@ -163,14 +170,20 @@ class MainWindow(QMainWindow):
         self.rb_video = QRadioButton(T("rb_video"))
         self.rb_audio = QRadioButton(T("rb_audio"))
         self.rb_image = QRadioButton(T("rb_image"))
+        self.rb_upscale = QRadioButton(T("rb_upscale"))
         self.rb_video.setChecked(True)
         self.bg_type.addButton(self.rb_video, 0)
         self.bg_type.addButton(self.rb_audio, 1)
         self.bg_type.addButton(self.rb_image, 2)
+        self.bg_type.addButton(self.rb_upscale, 3)
         self.rb_video.toggled.connect(self._on_type_changed)
         self.rb_audio.toggled.connect(self._on_type_changed)
         self.rb_image.toggled.connect(self._on_type_changed)
-        row2.addWidget(self.rb_video); row2.addWidget(self.rb_audio); row2.addWidget(self.rb_image)
+        self.rb_upscale.toggled.connect(self._on_type_changed)
+        row2.addWidget(self.rb_video)
+        row2.addWidget(self.rb_audio)
+        row2.addWidget(self.rb_image)
+        row2.addWidget(self.rb_upscale)
         row2.addStretch()
         self.opts_layout.addLayout(row2)
         self._sep()
@@ -301,6 +314,128 @@ class MainWindow(QMainWindow):
         )
         ilay.addWidget(self.lbl_raw_note)
         self.opts_layout.addWidget(self.grp_image)
+
+        # ── STEP 3 (upscaling): Mini Sharpening Upscale (filtri interni FFmpeg) ──
+        self.grp_upscale = QGroupBox(T("grp_upscale_title"))
+        ulay = QVBoxLayout(self.grp_upscale)
+
+        self.lbl_upscale_info = QLabel(T("lbl_upscale_info"))
+        self.lbl_upscale_info.setWordWrap(True)
+        self.lbl_upscale_info.setStyleSheet("color:#aaaaff; font-size:11px; padding: 4px 0;")
+        ulay.addWidget(self.lbl_upscale_info)
+
+        sep_u = QFrame(); sep_u.setFrameShape(QFrame.Shape.HLine)
+        sep_u.setStyleSheet("color:#333355;")
+        ulay.addWidget(sep_u)
+
+        # Fattore di scala
+        scale_row = QHBoxLayout()
+        self.lbl_upscale_scale = QLabel(T("lbl_upscale_scale"))
+        scale_row.addWidget(self.lbl_upscale_scale)
+        self.cmb_upscale_factor = QComboBox()
+        self.cmb_upscale_factor.addItems(list(SCALE_FACTORS.keys()))
+        self.cmb_upscale_factor.setCurrentText("2x")
+        scale_row.addWidget(self.cmb_upscale_factor)
+        scale_row.addStretch()
+        ulay.addLayout(scale_row)
+
+        # Denoise pre-scaling
+        dn_row = QHBoxLayout()
+        self.lbl_upscale_denoise = QLabel(T("lbl_upscale_denoise"))
+        dn_row.addWidget(self.lbl_upscale_denoise)
+        self.sld_upscale_denoise = QSlider(Qt.Orientation.Horizontal)
+        self.sld_upscale_denoise.setMinimum(0)
+        self.sld_upscale_denoise.setMaximum(30)
+        self.sld_upscale_denoise.setValue(10)
+        self.sld_upscale_denoise.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.sld_upscale_denoise.valueChanged.connect(
+            lambda v: self.lbl_upscale_denoise_val.setText(f"{v/10:.1f}")
+        )
+        self.lbl_upscale_denoise_val = QLabel("1.0")
+        self.lbl_upscale_denoise_val.setStyleSheet("color:#a0d0ff; font-weight:bold; min-width:28px;")
+        dn_row.addWidget(self.sld_upscale_denoise)
+        dn_row.addWidget(self.lbl_upscale_denoise_val)
+        ulay.addLayout(dn_row)
+
+        # Sharpen post-scaling
+        sh_row = QHBoxLayout()
+        self.lbl_upscale_sharpen = QLabel(T("lbl_upscale_sharpen"))
+        sh_row.addWidget(self.lbl_upscale_sharpen)
+        self.sld_upscale_sharpen = QSlider(Qt.Orientation.Horizontal)
+        self.sld_upscale_sharpen.setMinimum(0)
+        self.sld_upscale_sharpen.setMaximum(20)
+        self.sld_upscale_sharpen.setValue(6)
+        self.sld_upscale_sharpen.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.sld_upscale_sharpen.valueChanged.connect(
+            lambda v: self.lbl_upscale_sharpen_val.setText(f"{v/10:.1f}")
+        )
+        self.lbl_upscale_sharpen_val = QLabel("0.6")
+        self.lbl_upscale_sharpen_val.setStyleSheet("color:#a0d0ff; font-weight:bold; min-width:28px;")
+        sh_row.addWidget(self.sld_upscale_sharpen)
+        sh_row.addWidget(self.lbl_upscale_sharpen_val)
+        ulay.addLayout(sh_row)
+
+        sep_u2 = QFrame(); sep_u2.setFrameShape(QFrame.Shape.HLine)
+        sep_u2.setStyleSheet("color:#333355;")
+        ulay.addWidget(sep_u2)
+
+        # Formato output + codec (il codec disponibile dipende dal container:
+        # MP4/MKV → AV1/H.264/H.265, MOV → solo ProRes/DNxHR)
+        fmt_row = QHBoxLayout()
+        self.lbl_upscale_format = QLabel(T("lbl_upscale_format"))
+        fmt_row.addWidget(self.lbl_upscale_format)
+        self.cmb_upscale_container = QComboBox()
+        self.cmb_upscale_container.addItems(list(UPSCALE_CONTAINERS.keys()))
+        self.cmb_upscale_container.currentTextChanged.connect(self._on_upscale_container_changed)
+        fmt_row.addWidget(self.cmb_upscale_container)
+        fmt_row.addSpacing(20)
+        self.lbl_upscale_encoder = QLabel(T("lbl_vcodec"))
+        fmt_row.addWidget(self.lbl_upscale_encoder)
+        self.cmb_upscale_codec = QComboBox()
+        self.cmb_upscale_codec.currentTextChanged.connect(self._update_cmd_preview)
+        fmt_row.addWidget(self.cmb_upscale_codec)
+        fmt_row.addStretch()
+        ulay.addLayout(fmt_row)
+
+        # Backend di codifica: CPU o GPU (NVIDIA/AMD/Intel), disattivato
+        # per i codec mezzanine (ProRes/DNxHR), che sono sempre CPU
+        gpu_row_u = QHBoxLayout()
+        gpu_row_u.addWidget(QLabel(T("lbl_gpu")))
+        self.bg_upscale_gpu = QButtonGroup(self)
+        for i, g in enumerate(GPU_OPTIONS):
+            rb = QRadioButton(g)
+            if g == "CPU": rb.setChecked(True)
+            self.bg_upscale_gpu.addButton(rb, i)
+            gpu_row_u.addWidget(rb)
+            rb.toggled.connect(self._update_cmd_preview)
+        gpu_row_u.addStretch()
+        ulay.addLayout(gpu_row_u)
+
+        # Qualità: 5 step tradotti (il più alto = massima qualità possibile
+        # per l'encoder scelto, il più basso = qualità minima)
+        qual_row = QHBoxLayout()
+        self.lbl_upscale_quality = QLabel(T("lbl_upscale_quality"))
+        qual_row.addWidget(self.lbl_upscale_quality)
+        self.cmb_upscale_quality = QComboBox()
+        for lvl in UPSCALE_QUALITY_LEVELS:
+            self.cmb_upscale_quality.addItem(T(f"upq_{lvl}"), lvl)
+        self.cmb_upscale_quality.setCurrentIndex(2)  # "mid" di default
+        qual_row.addWidget(self.cmb_upscale_quality)
+        qual_row.addStretch()
+        ulay.addLayout(qual_row)
+
+        # Popola codec + stato backend in base al container selezionato all'avvio
+        self._on_upscale_container_changed(self.cmb_upscale_container.currentText())
+
+        # hwaccel decodifica (stesso stile della modalità video)
+        hw_row_u = QHBoxLayout()
+        self.chk_upscale_hwaccel = QCheckBox(T("chk_hwaccel"))
+        self.chk_upscale_hwaccel.setChecked(True)
+        hw_row_u.addWidget(self.chk_upscale_hwaccel); hw_row_u.addStretch()
+        ulay.addLayout(hw_row_u)
+
+        self.opts_layout.addWidget(self.grp_upscale)
+
         # ── STEP 4: audio ─────────────────────────────────────
         self.grp_audio = QGroupBox("STEP 4 — Audio")
         alay = QVBoxLayout(self.grp_audio)
@@ -537,17 +672,57 @@ class MainWindow(QMainWindow):
         if hasattr(self, "lbl_raw_note"):
             self.lbl_raw_note.setVisible(is_image and not is_single)
         self._update_cmd_preview()
+    def _on_upscale_container_changed(self, container_label):
+        """Ripopola il codec disponibile in base al container scelto:
+        MP4/MKV → AV1/H.264/H.265 (CPU+GPU), MOV → solo ProRes/DNxHR
+        (mezzanine, sempre CPU: disattiva la scelta del backend GPU)."""
+        if not hasattr(self, "cmb_upscale_codec"):
+            return
+        codecs = UPSCALE_CODECS_BY_CONTAINER.get(
+            container_label, UPSCALE_CODECS_BY_CONTAINER["MKV (.mkv)"])
+        self.cmb_upscale_codec.blockSignals(True)
+        self.cmb_upscale_codec.clear()
+        self.cmb_upscale_codec.addItems(codecs)
+        self.cmb_upscale_codec.blockSignals(False)
+        is_gpu = all(c not in ("ProRes", "DNxHR") for c in codecs)
+        if hasattr(self, "bg_upscale_gpu"):
+            for btn in self.bg_upscale_gpu.buttons():
+                btn.setEnabled(is_gpu)
+
+    def _get_selected_upscale_gpu(self):
+        btn = self.bg_upscale_gpu.checkedButton() if hasattr(self, "bg_upscale_gpu") else None
+        return btn.text() if btn else "CPU"
+
     def _on_type_changed(self):
-        is_video = self.rb_video.isChecked()
-        is_audio = self.rb_audio.isChecked()
-        is_image = self.rb_image.isChecked()
-        is_folder = self.rb_folder.isChecked()
+        is_video   = self.rb_video.isChecked()
+        is_audio   = self.rb_audio.isChecked()
+        is_image   = self.rb_image.isChecked()
+        is_upscale = hasattr(self, "rb_upscale") and self.rb_upscale.isChecked()
+        is_folder  = self.rb_folder.isChecked()
         self.grp_video.setVisible(is_video)
         self.grp_image.setVisible(is_image)
-        self.grp_audio.setVisible(not is_image)
-        # Nota RAW visibile solo in modalità cartella
+        self.grp_audio.setVisible(not is_image and not is_upscale)
+        if hasattr(self, "grp_upscale"):
+            self.grp_upscale.setVisible(is_upscale)
+        # Il comando manuale (grp_cmd) non si applica alla modalità upscaling,
+        # che costruisce sempre il proprio comando internamente
+        if hasattr(self, "grp_cmd"):
+            self.grp_cmd.setVisible(not is_upscale)
+        # I sottotitoli non sono ancora supportati nella modalità upscaling
+        if hasattr(self, "btn_subtitles"):
+            self.btn_subtitles.setVisible(not is_upscale)
+        # Nota RAW visibile solo in modalità cartella (solo immagini)
         if hasattr(self, "lbl_raw_note"):
             self.lbl_raw_note.setVisible(is_image and is_folder)
+        if is_upscale:
+            # Nome file: riusa i pannelli "video" (stessa numerazione step)
+            if hasattr(self, "grp_name"):
+                self.grp_name.setVisible(True)
+                is_single = self.rb_single.isChecked()
+                self.grp_name.setTitle(
+                    T("grp_name_single_v") if is_single else T("grp_name_folder_v")
+                )
+            return
         # Numera gli step dinamicamente in base alla modalità
         if is_video:
             self.grp_audio.setTitle(T("grp_audio_v"))
@@ -705,12 +880,6 @@ class MainWindow(QMainWindow):
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self._auto_settings = dlg.get_settings()
 
-    # ── AI Upscaling methods ──────────────────────────────────────────────
-    def _ai_add_model(self):
-        """Apre il file dialog per aggiungere un modello AI."""
-        path, _ = QFileDialog.getOpenFileName(
-            self, T("dlg_ai_model_title"), "",
-            T("dlg_ai_model_filter"))
     def _save_ffmpeg_preset(self):
         """Salva il comando corrente come preset FFmpeg tramite FfmpegPresetSaveDialog."""
         cmd = self.txt_cmd.text().strip()
@@ -758,6 +927,8 @@ class MainWindow(QMainWindow):
             mode = "image"
         elif self.rb_audio.isChecked():
             mode = "audio"
+        elif hasattr(self, "rb_upscale") and self.rb_upscale.isChecked():
+            mode = "upscale"
         else:
             mode = "video"
         vcodec  = self.cmb_vcodec.currentText()
@@ -777,6 +948,10 @@ class MainWindow(QMainWindow):
         img_fmt_label = self.cmb_imgfmt.currentText()
         img_fmt       = IMAGE_OUTPUT_FORMATS.get(img_fmt_label, "jpg")
         img_quality   = self.sld_imgqual.value()
+        # parametri mini upscaling (sharpening)
+        upscale_ext = UPSCALE_CONTAINERS.get(
+            getattr(self, "cmb_upscale_container", None).currentText()
+            if hasattr(self, "cmb_upscale_container") else "MKV (.mkv)", "mkv")
         return {
             "mode":         mode,
             "video_ext":    video_ext,
@@ -796,6 +971,22 @@ class MainWindow(QMainWindow):
             "auto_settings": dict(getattr(self, "_auto_settings", {})),
             "is_folder":    self.rb_folder.isChecked(),
             "sub_settings":   dict(getattr(self, "_sub_settings", {})),
+            # ── Mini Sharpening Upscale ──
+            "upscale_ext":     upscale_ext,
+            "upscale_target":  SCALE_FACTORS.get(
+                                    getattr(self, "cmb_upscale_factor", None).currentText()
+                                    if hasattr(self, "cmb_upscale_factor") else "2x", 2.0),
+            "upscale_denoise": getattr(self, "sld_upscale_denoise", None).value() / 10
+                                    if hasattr(self, "sld_upscale_denoise") else 1.0,
+            "upscale_sharpen": getattr(self, "sld_upscale_sharpen", None).value() / 10
+                                    if hasattr(self, "sld_upscale_sharpen") else 0.6,
+            "upscale_codec":   getattr(self, "cmb_upscale_codec", None).currentText()
+                                    if hasattr(self, "cmb_upscale_codec") else "H.264",
+            "upscale_gpu":     self._get_selected_upscale_gpu(),
+            "upscale_quality": getattr(self, "cmb_upscale_quality", None).currentData()
+                                    if hasattr(self, "cmb_upscale_quality") else "mid",
+            "upscale_hwaccel": getattr(self, "chk_upscale_hwaccel", None).isChecked()
+                                    if hasattr(self, "chk_upscale_hwaccel") else True,
         }
     def _unique_path(self, dst):
         if not os.path.exists(dst): return dst
@@ -855,6 +1046,28 @@ class MainWindow(QMainWindow):
                         else:
                             dst = os.path.join(out_dir, rel, f"{stem}.{img_fmt}")
                             jobs.append((src, self._unique_path(dst), dummy_info, False))
+        elif mode == "upscale":
+            # ── modalità mini sharpening upscale (solo video, un solo passaggio) ──
+            out_ext    = params["upscale_ext"]
+            valid_exts = VIDEO_EXTENSIONS
+            if is_single:
+                if not os.path.isfile(path): return []
+                stem = prefix if prefix else f"{Path(path).stem}_UPSCALED"
+                dst  = str(Path(path).parent / f"{stem}.{out_ext}")
+                jobs.append((path, self._unique_path(dst)))
+            else:
+                if not os.path.isdir(path): return []
+                out_dir = os.path.join(path, "UPSCALED_DISAGIO")
+                for root_d, dirs, files in os.walk(path):
+                    dirs[:] = [d for d in dirs
+                                if os.path.join(root_d, d) != out_dir]
+                    for f in sorted(files):
+                        if Path(f).suffix.lower() not in valid_exts: continue
+                        src  = os.path.join(root_d, f)
+                        stem = f"{prefix}_{Path(f).stem}" if prefix else Path(f).stem
+                        rel  = os.path.relpath(root_d, path)
+                        dst  = os.path.join(out_dir, rel, f"{stem}.{out_ext}")
+                        jobs.append((src, self._unique_path(dst)))
         else:
             # ── modalità video/audio ───────────────────────────
             out_ext    = params["audio_ext"] if mode == "audio" else params["video_ext"]
@@ -904,10 +1117,10 @@ class MainWindow(QMainWindow):
         else:
             params.pop("manual_cmd", None)
         mode = params["mode"]
-        raw_jobs   = sum(1 for j in jobs if j[3])
-        conv_jobs  = len(jobs) - raw_jobs
         lines = []
         if mode == "image":
+            raw_jobs   = sum(1 for j in jobs if j[3])
+            conv_jobs  = len(jobs) - raw_jobs
             if conv_jobs:
                 lines.append(f"{T('conf_img_conv')} {conv_jobs}")
             if raw_jobs:
@@ -915,6 +1128,23 @@ class MainWindow(QMainWindow):
             lines += [
                 f"{T('conf_fmt')} .{params['img_fmt'].upper()}",
                 f"{T('conf_qual')} {image_quality_label(params['img_quality'])}",
+            ]
+        elif mode == "upscale":
+            factor_label = next(
+                (k for k, v in SCALE_FACTORS.items() if v == params["upscale_target"]),
+                f"{params['upscale_target']}x"
+            )
+            encoder_code = resolve_upscale_encoder(
+                params['upscale_codec'], params['upscale_gpu'])
+            encoder_label = T(UPSCALE_ENCODER_LABEL_KEYS.get(
+                encoder_code, encoder_code))
+            quality_label = T(f"upq_{params['upscale_quality']}")
+            lines += [
+                f"{T('conf_files')} {len(jobs)}",
+                f"{T('conf_upscale_scale')} {factor_label}",
+                f"{T('conf_upscale_encoder')} {encoder_label}",
+                f"{T('conf_upscale_quality')} {quality_label}",
+                f"{T('conf_upscale_format')} .{params['upscale_ext']}",
             ]
         else:
             lines.append(f"{T('conf_files')} {len(jobs)}")
@@ -944,7 +1174,20 @@ class MainWindow(QMainWindow):
         self.progress_bar.setVisible(True)
         self.btn_stop.setVisible(True)
         self.btn_go.setEnabled(False)
-        self.thread = ConvertThread(jobs, params)
+        if mode == "upscale":
+            upscale_params = {
+                "target":      params["upscale_target"],
+                "denoise":     params["upscale_denoise"],
+                "sharpen":     params["upscale_sharpen"],
+                "codec":       params["upscale_codec"],
+                "gpu":         params["upscale_gpu"],
+                "quality":     params["upscale_quality"],
+                "hwaccel":     params["upscale_hwaccel"],
+                "verbose_log": params["verbose_log"],
+            }
+            self.thread = UpscaleThread(jobs, upscale_params)
+        else:
+            self.thread = ConvertThread(jobs, params)
         self.thread.log_line.connect(self._append_log)
         self.thread.progress.connect(self.progress_bar.setValue)
         self.thread.file_done.connect(self._on_file_done)
@@ -959,7 +1202,7 @@ class MainWindow(QMainWindow):
     def _stop(self):
         if self.thread:
             self.thread.stop()
-            self._append_log(T("log_interrupted"))
+        self._append_log(T("log_interrupted"))
     def _append_log(self, text):
         self.terminal.appendPlainText(text)
         self.terminal.moveCursor(QTextCursor.MoveOperation.End)

@@ -97,6 +97,11 @@ TRANSLATIONS = {
         "it": "Immagini", "en": "Images", "de": "Bilder",
         "es": "Imágenes", "doge": "much picture, wow",
     },
+    "rb_upscale": {
+        "it": "🔬 Upscaling Nitidezza", "en": "🔬 Sharpening Upscale",
+        "de": "🔬 Schärfe-Upscaling", "es": "🔬 Escalado con Nitidez",
+        "doge": "🔬 big pixel sharp wow",
+    },
     # ── Step 3 video ───────────────────────────────────────
     "grp_video": {
         "it": "STEP 3 — Video", "en": "STEP 3 — Video",
@@ -827,6 +832,176 @@ TRANSLATIONS = {
     "keep_original": {
         "it": "Mantieni originale", "en": "Keep original", "de": "Original beibehalten",
         "es": "Mantener original", "doge": "keep as is wow",
+    },
+
+    # ── Mini Sharpening Upscale panel ───────────────────────
+    "grp_upscale_title": {
+        "it": "🔬 Mini Upscaling Nitidezza", "en": "🔬 Mini Sharpening Upscale",
+        "de": "🔬 Mini Schärfe-Upscaling", "es": "🔬 Mini Escalado con Nitidez",
+        "doge": "🔬 mini big pixel sharp wow",
+    },
+    "lbl_upscale_info": {
+        "it": "Upscaling in un solo passaggio, tramite filtri nativi FFmpeg "
+              "(denoise + scaling Lanczos + unsharp mirato). Un ingrandimento "
+              "di alta qualità con nitidezza ottimizzata, senza reti neurali "
+              "né strumenti esterni.",
+        "en": "Single-pass upscaling using native FFmpeg filters "
+              "(denoise + Lanczos scaling + targeted unsharp). A high-quality "
+              "enlargement with optimized sharpness, no neural networks or "
+              "external tools.",
+        "de": "Upscaling in einem einzigen Durchgang mit nativen FFmpeg-Filtern "
+              "(Denoise + Lanczos-Skalierung + gezieltes Unsharp). Eine "
+              "hochwertige Vergrößerung mit optimierter Schärfe, ganz ohne "
+              "neuronale Netze oder externe Tools.",
+        "es": "Escalado en un solo paso mediante filtros nativos de FFmpeg "
+              "(reducción de ruido + escalado Lanczos + enfoque específico). "
+              "Un aumento de alta calidad con nitidez optimizada, sin redes "
+              "neuronales ni herramientas externas.",
+        "doge": "one pass much upscale, native ffmpeg filter "
+                "(denoise + lanczos + sharp wow). such quality big pixel, "
+                "very sharp. no neural net, no extra tool needed.",
+    },
+    "lbl_upscale_scale": {
+        "it": "Scala:", "en": "Scale:", "de": "Skalierung:", "es": "Escala:",
+        "doge": "so big:",
+    },
+    "lbl_upscale_denoise": {
+        "it": "Denoise pre-upscale (pulisce prima di ingrandire):",
+        "en": "Pre-upscale denoise (cleans up before enlarging):",
+        "de": "Denoise vor dem Upscaling (bereinigt vor der Vergrößerung):",
+        "es": "Reducción de ruido previa al escalado (limpia antes de agrandar):",
+        "doge": "clean before big pixel (denoise wow):",
+    },
+    "lbl_upscale_sharpen": {
+        "it": "Nitidezza post-upscale:",
+        "en": "Post-upscale sharpness:",
+        "de": "Schärfe nach dem Upscaling:",
+        "es": "Nitidez tras el escalado:",
+        "doge": "sharp after big pixel:",
+    },
+    "lbl_upscale_format": {
+        "it": "Formato output:", "en": "Output format:", "de": "Ausgabeformat:",
+        "es": "Formato de salida:", "doge": "output shape:",
+    },
+    "lbl_upscale_encoder": {
+        "it": "Encoder:", "en": "Encoder:", "de": "Encoder:",
+        "es": "Codificador:", "doge": "such chip:",
+    },
+    "lbl_upscale_quality": {
+        "it": "Qualità:", "en": "Quality:", "de": "Qualität:",
+        "es": "Calidad:", "doge": "how good:",
+    },
+    "upq_max": {
+        "it": "Massima qualità", "en": "Maximum quality", "de": "Maximale Qualität",
+        "es": "Calidad máxima", "doge": "much quality wow",
+    },
+    "upq_high": {
+        "it": "Alta qualità", "en": "High quality", "de": "Hohe Qualität",
+        "es": "Alta calidad", "doge": "good quality wow",
+    },
+    "upq_mid": {
+        "it": "Qualità media", "en": "Medium quality", "de": "Mittlere Qualität",
+        "es": "Calidad media", "doge": "medium quality. such balance.",
+    },
+    "upq_low": {
+        "it": "Qualità bassa", "en": "Low quality", "de": "Niedrige Qualität",
+        "es": "Calidad baja", "doge": "smol quality wow",
+    },
+    "upq_min": {
+        "it": "Qualità minima", "en": "Minimum quality", "de": "Minimale Qualität",
+        "es": "Calidad mínima", "doge": "tiny quality. very smol.",
+    },
+    "enc_libx264": {
+        "it": "libx264 (CPU — Alta compatibilità)",
+        "en": "libx264 (CPU — High compatibility)",
+        "de": "libx264 (CPU — Hohe Kompatibilität)",
+        "es": "libx264 (CPU — Alta compatibilidad)",
+        "doge": "libx264 (CPU — much compatible wow)",
+    },
+    "enc_libx265": {
+        "it": "libx265 (CPU — HEVC)", "en": "libx265 (CPU — HEVC)",
+        "de": "libx265 (CPU — HEVC)", "es": "libx265 (CPU — HEVC)",
+        "doge": "libx265 (CPU — HEVC wow)",
+    },
+    "enc_libsvtav1": {
+        "it": "libsvtav1 (CPU — AV1)", "en": "libsvtav1 (CPU — AV1)",
+        "de": "libsvtav1 (CPU — AV1)", "es": "libsvtav1 (CPU — AV1)",
+        "doge": "libsvtav1 (CPU — AV1 wow)",
+    },
+    "enc_h264_nvenc": {
+        "it": "h264_nvenc (NVIDIA — H264)", "en": "h264_nvenc (NVIDIA — H264)",
+        "de": "h264_nvenc (NVIDIA — H264)", "es": "h264_nvenc (NVIDIA — H264)",
+        "doge": "h264_nvenc (NVIDIA — H264 wow)",
+    },
+    "enc_hevc_nvenc": {
+        "it": "hevc_nvenc (NVIDIA — HEVC)", "en": "hevc_nvenc (NVIDIA — HEVC)",
+        "de": "hevc_nvenc (NVIDIA — HEVC)", "es": "hevc_nvenc (NVIDIA — HEVC)",
+        "doge": "hevc_nvenc (NVIDIA — HEVC wow)",
+    },
+    "enc_av1_nvenc": {
+        "it": "av1_nvenc (NVIDIA — AV1)", "en": "av1_nvenc (NVIDIA — AV1)",
+        "de": "av1_nvenc (NVIDIA — AV1)", "es": "av1_nvenc (NVIDIA — AV1)",
+        "doge": "av1_nvenc (NVIDIA — AV1 wow)",
+    },
+    "enc_hevc_amf": {
+        "it": "hevc_amf (AMD — HEVC)", "en": "hevc_amf (AMD — HEVC)",
+        "de": "hevc_amf (AMD — HEVC)", "es": "hevc_amf (AMD — HEVC)",
+        "doge": "hevc_amf (AMD — HEVC wow)",
+    },
+    "enc_h264_amf": {
+        "it": "h264_amf (AMD — H264)", "en": "h264_amf (AMD — H264)",
+        "de": "h264_amf (AMD — H264)", "es": "h264_amf (AMD — H264)",
+        "doge": "h264_amf (AMD — H264 wow)",
+    },
+    "enc_av1_amf": {
+        "it": "av1_amf (AMD — AV1)", "en": "av1_amf (AMD — AV1)",
+        "de": "av1_amf (AMD — AV1)", "es": "av1_amf (AMD — AV1)",
+        "doge": "av1_amf (AMD — AV1 wow)",
+    },
+    "enc_h264_qsv": {
+        "it": "h264_qsv (Intel — H264)", "en": "h264_qsv (Intel — H264)",
+        "de": "h264_qsv (Intel — H264)", "es": "h264_qsv (Intel — H264)",
+        "doge": "h264_qsv (Intel — H264 wow)",
+    },
+    "enc_hevc_qsv": {
+        "it": "hevc_qsv (Intel — HEVC)", "en": "hevc_qsv (Intel — HEVC)",
+        "de": "hevc_qsv (Intel — HEVC)", "es": "hevc_qsv (Intel — HEVC)",
+        "doge": "hevc_qsv (Intel — HEVC wow)",
+    },
+    "enc_av1_qsv": {
+        "it": "av1_qsv (Intel — AV1)", "en": "av1_qsv (Intel — AV1)",
+        "de": "av1_qsv (Intel — AV1)", "es": "av1_qsv (Intel — AV1)",
+        "doge": "av1_qsv (Intel — AV1 wow)",
+    },
+    "enc_prores_ks": {
+        "it": "ProRes (CPU — Apple ProRes)",
+        "en": "ProRes (CPU — Apple ProRes)",
+        "de": "ProRes (CPU — Apple ProRes)",
+        "es": "ProRes (CPU — Apple ProRes)",
+        "doge": "ProRes (CPU — apple much res wow)",
+    },
+    "enc_dnxhd": {
+        "it": "DNxHR (CPU — Avid DNxHR)",
+        "en": "DNxHR (CPU — Avid DNxHR)",
+        "de": "DNxHR (CPU — Avid DNxHR)",
+        "es": "DNxHR (CPU — Avid DNxHR)",
+        "doge": "DNxHR (CPU — avid much res wow)",
+    },
+    "conf_upscale_scale": {
+        "it": "Scala:", "en": "Scale:", "de": "Skalierung:", "es": "Escala:",
+        "doge": "so big:",
+    },
+    "conf_upscale_encoder": {
+        "it": "Encoder:", "en": "Encoder:", "de": "Encoder:",
+        "es": "Codificador:", "doge": "such chip:",
+    },
+    "conf_upscale_quality": {
+        "it": "Qualità:", "en": "Quality:", "de": "Qualität:",
+        "es": "Calidad:", "doge": "how good:",
+    },
+    "conf_upscale_format": {
+        "it": "Formato output:", "en": "Output format:", "de": "Ausgabeformat:",
+        "es": "Formato de salida:", "doge": "output shape:",
     },
 }
 
