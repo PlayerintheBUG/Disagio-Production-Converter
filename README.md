@@ -22,6 +22,17 @@ Un convertitore multimediale ad alte prestazioni. Sviluppato in Python con un'in
 * **Interfaccia Grafica Anti-Freeze:** Sfrutta l'architettura in multithreading nativo (`QThread`). Il motore di rendering lavora in totale isolamento in background: l'interfaccia utente (PyQt6) rimane fluida, risponde istantaneamente ai comandi e aggiorna la barra di avanzamento in tempo reale anche durante le conversioni più pesanti.
 * **Analisi Robusta dei Flussi:** Gestione avanzata dei flussi multimediali per prevenire crash ed errori critici su file danneggiati o complessi, tracce audio mancanti, flussi sottotitoli o video a framerate variabile (VFR).
 
+🔬 Modulo di Ingrandimento (Upscaling con Filtri)
+Questa funzione NON utilizza l'intelligenza artificiale o reti neurali: non inventa dettagli dal nulla e non richiede il download di modelli pesanti. Si tratta invece di una **pipeline di filtri nativa FFmpeg super veloce**, studiata per ingrandire i video in modo nitido e pulito in un unico passaggio, lavorando su tre fasi consecutive:
+
+1. Pulizia dal Rumore (`hqdn3d`): Rimuove le sgranature e i difetti di compressione *prima* dell'ingrandimento, evitando che il software aumenti anche i difetti visivi del vecchio file
+2. Ingrandimento Ottimizzato (Filtro Lanczos): Modifica le dimensioni geometriche del video (a `2x`, `3x` o `4x`) mantenendo le proporzioni originali intatte ed evitando distorsioni
+3. Nitidezza dei Bordi (`unsharp`): Applica un filtro di contrasto mirato sui contorni subito dopo l'ingrandimento, migliorando la definizione percepita dei dettagli
+
+Caratteristiche e Gestione dei Formati:
+* **Formati Standard (MP4 / MKV):** Permette di esportare in AV1, H.264 o H.265 sfruttando sia la CPU che l'accelerazione della scheda video (NVIDIA, AMD, Intel) per la massima velocità La qualità si imposta facilmente su 5 livelli (da minima a massima)
+* **Formati Professionali (MOV):** Ideale per chi fa montaggio video. Supporta la codifica diretta in Apple ProRes o Avid DNxHR (lavorando via CPU), configurando in automatico i profili di qualità ufficiali
+* **Audio Inalterato:** Qualunque sia il formato scelto, la traccia audio originale non viene mai ricodificata, ma viene copiata direttamente a specchio per mantenere la massima fedeltà (`-c:a copy`)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🚀 Accelerazione Hardware Avanzata
